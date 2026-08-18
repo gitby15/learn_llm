@@ -16,9 +16,9 @@ dependencies = [
 ]
 
 [project.scripts]
-inference-cli = "learn_llm.inference.cli:main"
-inference-web = "learn_llm.inference.web_server.inference_kernel:main"
-train-llm = "learn_llm.train:main"
+i-cli = "learn_llm.inference.cli:main"
+i-web = "learn_llm.inference.web_server.inference_kernel:main"
+pretrain = "learn_llm.pretrain.train:main"
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]
