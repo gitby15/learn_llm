@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tim-LLM 推理</title>
+    <link rel="stylesheet" href="/static/index.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Tim-LLM 推理(基座模型)</h1>
+        <div class="input-area">
+            <textarea id="prompt" placeholder="输入你的问题..." rows="4"></textarea>
+            <div class="controls">
+                <button id="send-btn" onclick="sendPrompt()">发送</button>
+                <span class="status" id="status"></span>
+            </div>
+        </div>
+        <div class="output-area">
+            <div id="output"></div>
+        </div>
+    </div>
+    <script src="/static/index.js"></script>
+</body>
+</html>

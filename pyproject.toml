@@ -5,6 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+     "accelerate>=1.14.0",
+     "bottle>=0.13.4",
+     "datasets>=5.0.1",
+     "modelscope>=1.39.1",
      "numpy>=2.5.2",
      "torch===2.8.0",
      "tqdm>=4.70.0",
@@ -12,8 +16,9 @@ dependencies = [
 ]
 
 [project.scripts]
-learn-llm = "learn_llm:main"
-timllm = "learn_llm.model.timllm:test"
+inference-cli = "learn_llm.inference.cli:main"
+inference-web = "learn_llm.inference.web_server.inference_kernel:main"
+train-llm = "learn_llm.train:main"
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]

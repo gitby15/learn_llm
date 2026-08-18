@@ -36,11 +36,9 @@ class Rope(nn.Module):
 class GQAAttention(nn.Module):
     def __init__(self, config: TimLLMConfig, rope: Rope):
         super().__init__()
-        self.config = config
         self.num_attention_heads = config.num_attention_heads
         self.num_key_value_heads = config.num_key_value_heads
         self.head_dim = config.gqa_head_dim
-        self.num_queries_per_kv = self.num_attention_heads // self.num_key_value_heads
 
         self.w_q = nn.Linear(config.hidden_size, self.num_attention_heads * self.head_dim, bias=False)
         self.w_k = nn.Linear(config.hidden_size, self.num_key_value_heads * self.head_dim, bias=False)
@@ -55,7 +53,7 @@ class GQAAttention(nn.Module):
         k: torch.Tensor,
         v: torch.Tensor,
     ) -> torch.Tensor:
-        # q, k, v的形状：[B, H, T, D]
+        # q, k, v的形状：[B, T, C]
         b = q.size(0)
         t_q = q.size(1)
         t_kv = k.size(1)
@@ -91,39 +89,37 @@ class TransformerBlock(nn.Module):
     """Pre-Norm 结构：残差 + LN + Attention/FFN"""
     def __init__(self, config: TimLLMConfig, rope: Rope):
         super().__init__()
-        self.config = config
         self.layer_norm_1 = nn.LayerNorm(config.hidden_size)
         self.attention = GQAAttention(config, rope)
+        self.dropout_attn = nn.Dropout(config.dropout_rate)
         self.layer_norm_2 = nn.LayerNorm(config.hidden_size)
         self.feed_forward = nn.Sequential(
             nn.Linear(config.hidden_size, config.hidden_size * 4, bias=False),
             nn.GELU(),
             nn.Linear(config.hidden_size * 4, config.hidden_size, bias=False),
         )
+        self.dropout_ffn = nn.Dropout(config.dropout_rate)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         normed = self.layer_norm_1(x)
-        
-        attention_output = self.attention(normed, normed, normed)
+        attn_out = self.attention(normed, normed, normed)
+        x = x + self.dropout_attn(attn_out)
 
-        # 残差连接
-        attention_output = x + attention_output
-        ffn_input = self.layer_norm_2(attention_output)
-        ffn_output = ffn_input + self.feed_forward(ffn_input)
-        return ffn_output
+        normed = self.layer_norm_2(x)
+        ffn_out = self.feed_forward(normed)
+        x = x + self.dropout_ffn(ffn_out)
+
+        return x
 
 
 class AttentionLayer(nn.Module):
     def __init__(self, config: TimLLMConfig):
         super().__init__()
-        self.rope = Rope(config)
         self.blocks = nn.ModuleList([
-            TransformerBlock(config, self.rope)
+            TransformerBlock(config, Rope(config))
             for _ in range(config.num_hidden_layers)
         ])
         self.final_norm = nn.LayerNorm(config.hidden_size)
-        self.num_attention_heads = config.num_attention_heads
-        self.gqa_head_dim = config.gqa_head_dim
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         
@@ -137,6 +133,6 @@ class AttentionLayer(nn.Module):
 
 if __name__ == "__main__":
     from learn_llm.model.model_config import TimLLMConfig
-    config = TimLLMConfig()
+    config = TimLLMConfig(vocab_size=100000)
     rope = Rope(config)
     print(rope)

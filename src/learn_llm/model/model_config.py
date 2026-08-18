@@ -6,24 +6,27 @@ class TimLLMConfig(PreTrainedConfig):
 
     def __init__(
         self,
-        vocab_size: int = 32000,
-        hidden_size: int = 512,
+        vocab_size: int = 6400,
         num_hidden_layers: int = 6,
-        gqa_head_dim: int = 64,
-        num_attention_heads: int = 8,
-        num_key_value_heads: int = 4,
+        gqa_head_dim: int = 128,
+        num_attention_heads: int = 4,
+        num_key_value_heads: int = 2,
         max_position_embeddings: int = 512,
         rope_freq: int = 10000,
+        dropout_rate: float = 0.1,
+        **kwargs,
     ):
-        # 所有自定义字段必须通过 kwargs 传给 PreTrainedConfig 注册
+        kwargs.pop("hidden_size", None)
         super().__init__(
             vocab_size=vocab_size,
-            hidden_size=hidden_size,
+            hidden_size=gqa_head_dim * num_attention_heads,
             num_hidden_layers=num_hidden_layers,
             gqa_head_dim=gqa_head_dim,
             num_attention_heads=num_attention_heads,
             num_key_value_heads=num_key_value_heads,
             max_position_embeddings=max_position_embeddings,
             rope_freq=rope_freq,
+            dropout_rate=dropout_rate,
+            **kwargs,
         )
-        assert hidden_size == gqa_head_dim * num_attention_heads
+        

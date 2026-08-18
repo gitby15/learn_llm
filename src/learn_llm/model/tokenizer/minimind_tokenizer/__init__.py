@@ -10,12 +10,6 @@ class MinimindTokenizer():
         self.tokenizer = AutoTokenizer.from_pretrained(folder_path)
     def get_tokenizer(self):
         return self.tokenizer
-    def __call__(self, text: str):
-        return self.tokenizer(text)
-    def get_pad_id(self) -> int:
-        return self.tokenizer.pad_token_id
-    def get_vocab_size(self) -> int:
-        return self.tokenizer.vocab_size
 
 
 if __name__ == "__main__":
