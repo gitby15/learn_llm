@@ -24,29 +24,24 @@ def tokenize_function(examples, tokenizer, max_length=512):
     tokenized["labels"] = labels
     return tokenized
 
-# Todo: 弄清楚为啥会遇到这个accelerate的兼容性问题
-class SimpleTensorDataset(torch.utils.data.Dataset):
-    """将 HuggingFace Dataset 转为简单 TensorDataset，绕过 accelerate 兼容问题"""
-    def __init__(self, hf_dataset):
-        self.input_ids = torch.tensor([item["input_ids"] for item in hf_dataset], dtype=torch.long)
-        self.attention_mask = torch.tensor([item["attention_mask"] for item in hf_dataset], dtype=torch.long)
-        self.labels = torch.tensor([item["labels"] for item in hf_dataset], dtype=torch.long)
+class StreamingIterableDataset(torch.utils.data.IterableDataset):
+    def __init__(self, iterable_dataset, length=None):
+        self.dataset = iterable_dataset
+        self._length = length
 
     def __len__(self):
-        return len(self.input_ids)
+        if self._length is not None:
+            return self._length
+        raise TypeError(f"{type(self).__name__} has no length; pass `length` to constructor")
 
-    def __getitem__(self, idx):
-        return {
-            "input_ids": self.input_ids[idx],
-            "attention_mask": self.attention_mask[idx],
-            "labels": self.labels[idx],
-        }
+    def __iter__(self):
+        yield from self.dataset
 
 
 
 # samples_len -1表示不限制数据量，即使用所有数据样本
 def train(
-        samples_start_index:int = 0,
+        sample_skip:int = 0,
         samples_len: int = 100,
         resume_dir: str = "./trained_model"
     ):
@@ -69,20 +64,23 @@ def train(
     # 2. 加载数据集
     dataset = get_train_dataset()
 
+    
+    
     # 2.1 限制数据量（只取前 samples_len 条）
-    if samples_len != -1:
-        dataset = dataset.select(range(samples_start_index, samples_start_index + samples_len))
+    dataset = dataset.skip(sample_skip)
+    if samples_len >= 0:
+        dataset = dataset.take(samples_len)
 
-    # 3. 预处理：tokenize
+    # 3. 预处理：流式 tokenize（这个map在真正被加载的时候才会执行）
+    per_device_train_batch_size=128
     tokenized_dataset = dataset.map(
         lambda x: tokenize_function(x, tokenizer),
         batched=True,
-        remove_columns=dataset.column_names,
-        load_from_cache_file=False,
+        batch_size=per_device_train_batch_size,
+        remove_columns=["text"],
     )
 
-    # 3.1 转为简单 TensorDataset
-    train_dataset = SimpleTensorDataset(tokenized_dataset)
+    train_dataset = StreamingIterableDataset(tokenized_dataset, length=samples_len if samples_len >= 0 else None)
 
     # 4. 数据整理器
     data_collator = default_data_collator
@@ -90,17 +88,24 @@ def train(
     # 5. 训练参数
     training_args = TrainingArguments(
         output_dir="./checkpoints",
-        per_device_train_batch_size=128,
+        per_device_train_batch_size=per_device_train_batch_size,
         gradient_accumulation_steps=4,
-        num_train_epochs=1, # 对于LLM来说，1~3 epoch就够了，需要弄清楚原理，我大概理解是需要一定的泛化能力
-        learning_rate=3e-4,
+        # 开了流式数据集，现在只支持跑一轮训练
+        num_train_epochs=1,
+
+        # 学习率相关的参数
+        learning_rate=6e-4,
+        # 用三角函数，学习率会平滑一些
         lr_scheduler_type="constant_with_warmup",
         warmup_steps=100,
-        logging_steps=50,          # 每步都输出 loss，在进度条中显示
+        # 每步都输出 loss，在进度条中显示
+        logging_steps=50,
         save_steps=500,
         save_total_limit=2,
-        fp16=torch.cuda.is_available(),  # 有 GPU 时开启混合精度
-        dataloader_pin_memory=False,      # default_device 已设 cuda，tensor 已在 GPU 上
+        # 有 GPU 时开启混合精度
+        fp16=torch.cuda.is_available(),
+        # default_device 已设 cuda，tensor 已在 GPU 上
+        dataloader_pin_memory=False,
         dataloader_num_workers=0,
         report_to="none",
         remove_unused_columns=False,
@@ -126,7 +131,7 @@ def train(
 
 
 def main():
-    train(samples_start_index=300000,samples_len=700000)
+    train(sample_skip=300000,samples_len=300000)
     # train(100, resume=True)  # 继续训练：从 ./trained_model 加载权重，换新数据
 
 if __name__ == "__main__":

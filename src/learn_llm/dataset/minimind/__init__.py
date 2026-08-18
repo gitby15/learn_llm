@@ -14,4 +14,4 @@ def _download_data():
 # 是一个很大的jsonl
 def get_train_dataset():
     data_files = _download_data()
-    return load_dataset('json', data_files=data_files, split='train')
+    return load_dataset('json', data_files=data_files, split='train', streaming=True)
