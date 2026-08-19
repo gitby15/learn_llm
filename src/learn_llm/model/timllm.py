@@ -30,7 +30,6 @@ class TimLLM(PreTrainedModel, GenerationMixin):
         self,
         input_ids: torch.LongTensor,
         labels: torch.LongTensor | None = None,
-        attention_mask: torch.LongTensor | None = None,
         **kwargs, # Todo: 研究一下transformer框架都会传什么东西进来
     ) -> CausalLMOutputWithPast:
 

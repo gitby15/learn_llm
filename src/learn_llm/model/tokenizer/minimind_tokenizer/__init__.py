@@ -5,7 +5,7 @@ from transformers import AutoTokenizer
 
 folder_path = os.path.dirname(__file__)
 
-class MinimindTokenizer():
+class MinimindTokenizer(AutoTokenizer):
     def __init__(self):
         self.tokenizer = AutoTokenizer.from_pretrained(folder_path)
     def get_tokenizer(self):

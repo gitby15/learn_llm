@@ -8,6 +8,7 @@ dependencies = [
      "accelerate>=1.14.0",
      "bottle>=0.13.4",
      "datasets>=5.0.1",
+     "lighteval>=0.13.0",
      "modelscope>=1.39.1",
      "numpy>=2.5.2",
      "torch===2.8.0",
@@ -18,7 +19,8 @@ dependencies = [
 [project.scripts]
 i-cli = "learn_llm.inference.cli:main"
 i-web = "learn_llm.inference.web_server.inference_kernel:main"
-pretrain = "learn_llm.pretrain.train:main"
+pre-t = "learn_llm.train.pretrain:main"
+pre-e = "learn_llm.train.pretrain.evaluate:main"
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]
