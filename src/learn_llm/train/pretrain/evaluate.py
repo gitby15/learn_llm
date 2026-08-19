@@ -14,7 +14,7 @@ def compute_perplexity(
     batch_size: int = 32,
     max_eval_batches: int | None = None,
 ) -> dict:
-    tokenizer = MinimindTokenizer().get_tokenizer()
+    tokenizer = MinimindTokenizer.get_tokenizer()
     eval_dataset = get_evaluate_dataset(
         samples_skip=samples_skip,
         samples_len=samples_len,
@@ -71,7 +71,7 @@ def generate_samples(
             "在数学中，",
         ]
 
-    tokenizer = MinimindTokenizer().get_tokenizer()
+    tokenizer = MinimindTokenizer.get_tokenizer()
     model.eval()
 
     results = []
@@ -98,17 +98,14 @@ def generate_samples(
 
 
 def evaluate(
-    model_dir: str = "./trained_model",
+    model_dir: str,
     samples_skip: int = 500000,
     samples_len: int = 500,
     batch_size: int = 32,
     max_eval_batches: int | None = None,
 ):
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
-    torch.set_default_device(DEVICE)
-    print(f"using device: {DEVICE}")
 
-    model = TimLLM.get_exist_model(DEVICE, model_dir)
+    model = ModelPath.get_exist_model(TimLLM, model_dir)
     print(f"从 {model_dir} 加载模型成功")
 
     print("\n" + "=" * 50)
@@ -138,7 +135,7 @@ def evaluate(
 
 def main():
     evaluate(
-        model_dir="./trained_model",
+        model_dir="./model_outputs/pretrain/save",
         samples_len=500,
         max_eval_batches=50,
     )    

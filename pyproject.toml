@@ -21,6 +21,7 @@ i-cli = "learn_llm.inference.cli:main"
 i-web = "learn_llm.inference.web_server.inference_kernel:main"
 pre-t = "learn_llm.train.pretrain:main"
 pre-e = "learn_llm.train.pretrain.evaluate:main"
+sft-t = "learn_llm.train.sft:main"
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]
