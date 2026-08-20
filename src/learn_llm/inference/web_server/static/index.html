@@ -3,21 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tim-LLM 推理</title>
+    <title>Tim-LLM 对话</title>
     <link rel="stylesheet" href="/static/index.css">
 </head>
 <body>
     <div class="container">
-        <h1>Tim-LLM 推理(基座模型)</h1>
+        <h1>Tim-LLM 对话</h1>
+        <div class="chat-box" id="chat-box">
+            <div class="empty-hint">开始对话吧</div>
+        </div>
         <div class="input-area">
-            <textarea id="prompt" placeholder="输入你的问题..." rows="4"></textarea>
+            <textarea id="prompt" placeholder="输入你的问题..." rows="3"></textarea>
             <div class="controls">
-                <button id="send-btn" onclick="sendPrompt()">发送</button>
+                <button id="send-btn" onclick="sendMessage()">发送</button>
+                <button id="clear-btn" class="secondary" onclick="clearChat()">清空对话</button>
                 <span class="status" id="status"></span>
             </div>
-        </div>
-        <div class="output-area">
-            <div id="output"></div>
         </div>
     </div>
     <script src="/static/index.js"></script>

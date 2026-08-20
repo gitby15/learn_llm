@@ -5,14 +5,18 @@ from transformers import AutoTokenizer
 
 folder_path = os.path.dirname(__file__)
 
-class MinimindTokenizer():
-    def __init__(self):
-        self.tokenizer = AutoTokenizer.from_pretrained(folder_path)
-    def get_tokenizer(self):
-        return self.tokenizer
+
+class MinimindTokenizer:
+    _tokenizer = None
+    @classmethod
+    def get_tokenizer(cls):
+        if cls._tokenizer is None:
+            cls._tokenizer = AutoTokenizer.from_pretrained(folder_path)
+        return cls._tokenizer
 
 
 if __name__ == "__main__":
-    tokenizer = MinimindTokenizer()
-    print(tokenizer.get_pad_id())
-    print(tokenizer.get_vocab_size())
+    tokenizer_1 = MinimindTokenizer.get_tokenizer()
+    tokenizer_2 = MinimindTokenizer.get_tokenizer()
+    print(tokenizer_1)
+    print(tokenizer_2)

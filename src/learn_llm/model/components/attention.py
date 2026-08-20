@@ -7,25 +7,21 @@ class Rope(nn.Module):
     def __init__(self, config: TimLLMConfig):
         super().__init__()
         self.dim = config.gqa_head_dim
-        self.max_seq_len = config.max_position_embeddings
         self.base = config.rope_freq
 
         inv_freq = 1.0 / (self.base ** (torch.arange(0, self.dim, 2).float() / self.dim))
         self.register_buffer("inv_freq", inv_freq)
-
-        t = torch.arange(self.max_seq_len).float()
-        freqs = torch.outer(t, inv_freq)
-        emb = torch.cat((freqs, freqs), dim=-1)
-        self.register_buffer("cos_cached", emb.cos())
-        self.register_buffer("sin_cached", emb.sin())
 
     def forward(self, x):
         return self.ropa_embedding(x)
 
     def ropa_embedding(self, x):
         seq_len = x.size(-2)
-        cos = self.cos_cached[:seq_len]
-        sin = self.sin_cached[:seq_len]
+        t = torch.arange(seq_len, device=x.device, dtype=x.dtype)
+        freqs = torch.outer(t, self.inv_freq.to(x.device))
+        emb = torch.cat((freqs, freqs), dim=-1)
+        cos = emb.cos()
+        sin = emb.sin()
         while cos.dim() < x.dim():
             cos = cos.unsqueeze(0)
             sin = sin.unsqueeze(0)
@@ -122,8 +118,6 @@ class AttentionLayer(nn.Module):
         self.final_norm = nn.LayerNorm(config.hidden_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        
-        
         attention_output = x
         for block in self.blocks:
             attention_output = block(attention_output)

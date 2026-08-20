@@ -2,6 +2,7 @@ import os
 import json
 from bottle import Bottle, request, static_file, response
 
+from learn_llm._utils_.model_path import ModelPath
 from learn_llm.inference import LLMGenerator
 
 app = Bottle()
@@ -13,7 +14,7 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 def get_generator() -> LLMGenerator:
     global _generator
     if _generator is None:
-        _generator = LLMGenerator()
+        _generator = LLMGenerator(model_path=ModelPath.SFT_SAVE, use_chat_template=True)
     return _generator
 
 
@@ -30,16 +31,17 @@ def serve_static(filename: str):
 @app.post("/generate")
 def generate():
     data = request.json
-    prompt = data.get("prompt", "").strip()
-    if not prompt:
+    messages = data.get("messages", [])
+    if not messages:
         response.status = 400
-        return {"error": "prompt 不能为空"}
+        return {"error": "messages 不能为空"}
 
     max_tokens = data.get("max_tokens", 256)
     temperature = data.get("temperature", 0.7)
 
-    output = get_generator().generate(
-        prompt,
+    generator = get_generator()
+    output = generator.generate_chat(
+        messages,
         max_new_tokens=max_tokens,
         temperature=temperature,
     )

@@ -10,6 +10,7 @@ from learn_llm.model.components.attention import AttentionLayer
 
 class TimLLM(PreTrainedModel, GenerationMixin):
     config_class = TimLLMConfig
+    _tied_weights_keys = {"lm_head.weight": "embedding.weight"}
 
     def __init__(self, config: TimLLMConfig):
         super().__init__(config)
@@ -17,20 +18,14 @@ class TimLLM(PreTrainedModel, GenerationMixin):
         self.embedding = nn.Embedding(config.vocab_size, config.hidden_size)
         self.dropout_embed = nn.Dropout(config.dropout_rate)
         self.attention_layer = AttentionLayer(config)
-        # LM Head: hidden -> vocab logits
-        self.lm_head = nn.Sequential(
-            nn.LayerNorm(config.hidden_size),
-            nn.Linear(config.hidden_size, config.hidden_size * 2, bias=False),
-            nn.GELU(),
-            nn.Linear(config.hidden_size * 2, config.vocab_size, bias=False),
-        )
+        # LM Head: Linear(hidden -> vocab)，归一化由 AttentionLayer.final_norm 完成
+        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.post_init()
 
     def forward(
         self,
         input_ids: torch.LongTensor,
         labels: torch.LongTensor | None = None,
-        attention_mask: torch.LongTensor | None = None,
         **kwargs, # Todo: 研究一下transformer框架都会传什么东西进来
     ) -> CausalLMOutputWithPast:
 
@@ -60,13 +55,20 @@ class TimLLM(PreTrainedModel, GenerationMixin):
             loss=loss,
             logits=logits,
         )
-    @staticmethod
-    def get_exist_model(device: torch.device, resume_dir: str = "./trained_model"):
-        try:
-            return TimLLM.from_pretrained(resume_dir).to(device)
-        except:
-            print(f"从 {resume_dir} 加载模型失败，返回空")
-            return None
+
+    def get_input_embeddings(self):
+        return self.embedding
+
+    def get_output_embeddings(self):
+        return self.lm_head
+
+    def set_output_embeddings(self, new_embeddings):
+        self.lm_head = new_embeddings
+
+    def tie_weights(self, **kwargs):
+        super().tie_weights(**kwargs)
+        if self.config.tie_word_embeddings:
+            self.lm_head.weight = self.embedding.weight
 
 
 
