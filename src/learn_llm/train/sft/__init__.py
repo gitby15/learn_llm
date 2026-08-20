@@ -8,22 +8,21 @@ import torch
 
 
 def train(
-    samples_skip: int = 0,
-    samples_len: int = 100,
+    samples_skip: int,
+    samples_len: int,
+    resume_dir: str,
 ):
 
     tokenizer = MinimindTokenizer.get_tokenizer()
 
-    model = ModelPath.get_exist_model(TimLLM, ModelPath.PRETRAIN_SAVE)
+    model = ModelPath.get_exist_model(TimLLM, resume_dir)
     if model is None:
-        raise FileNotFoundError(f"从 {ModelPath.PRETRAIN_SAVE} 加载模型失败，返回空")
+        raise FileNotFoundError(f"从 {resume_dir} 加载预训练模型失败，返回空")
 
-    # 2. 加载 SFT 数据集
-    per_device_train_batch_size = 32
     train_dataset = get_sft_train_dataset(
         samples_skip=samples_skip,
         samples_len=samples_len,
-        batch_size=per_device_train_batch_size,
+        batch_size=1024,
         tokenizer=tokenizer,
     )
 
@@ -32,21 +31,27 @@ def train(
     # 3. SFT 训练参数（学习率比预训练低）
     training_args = TrainingArguments(
         output_dir=ModelPath.SFT_CHECKPOINT,
-        per_device_train_batch_size=per_device_train_batch_size,
-        gradient_accumulation_steps=4,
+        save_total_limit=2,
+
         num_train_epochs=3,
+        
+        auto_find_batch_size=True,
+        gradient_accumulation_steps=4,
+        train_sampling_strategy="group_by_length", # 按长度分组采样，减少不必要的padding
 
         learning_rate=5e-5,
-        lr_scheduler_type="cosine",
+        lr_scheduler_type="cosine_with_restarts",
+        lr_scheduler_kwargs={"num_cycles": 3},
+        warmup_steps=100,
 
-        logging_steps=10,
-        save_steps=500,
-        save_total_limit=2,
+        logging_steps=20,
+        save_steps=400,
+        
         fp16=torch.cuda.is_available(),
-        dataloader_pin_memory=False,
+        
         dataloader_num_workers=0,
-        report_to="none",
-        remove_unused_columns=False,
+        # 本地可以看训练进展
+        report_to="tensorboard",
     )
 
     trainer = Trainer(
@@ -67,7 +72,7 @@ def train(
 
 
 def main():
-    train(samples_skip=0, samples_len=1000000)
+    train(samples_skip=0, samples_len=1000000, resume_dir=ModelPath.PRETRAIN_SAVE)
 
 
 if __name__ == "__main__":

@@ -118,8 +118,6 @@ class AttentionLayer(nn.Module):
         self.final_norm = nn.LayerNorm(config.hidden_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        
-        
         attention_output = x
         for block in self.blocks:
             attention_output = block(attention_output)

@@ -15,9 +15,10 @@ class LLMGenerator:
         self.tokenizer = MinimindTokenizer.get_tokenizer()
         self.use_chat_template = use_chat_template
 
-        self.model = ModelPath.get_exist_model(TimLLM, model_path)
-        if self.model is None:
+        model = ModelPath.get_exist_model(TimLLM, model_path)
+        if model is None:
             raise FileNotFoundError(f"模型 {model_path} 不存在")
+        self.model = model
         self.model.eval()
 
     def generate(

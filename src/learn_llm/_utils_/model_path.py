@@ -14,7 +14,7 @@ class ModelPath:
     SFT_SAVE = os.path.join(BASE, "sft", "save")
 
     @staticmethod
-    def get_exist_model(model_class: PreTrainedModel, model_dir: str):
+    def get_exist_model(model_class: type[PreTrainedModel], model_dir: str) -> PreTrainedModel | None:
         try:
             print(f"尝试加载模型，类型： {model_class.__name__} | 路径： {model_dir}")
             return model_class.from_pretrained(model_dir)

@@ -1,7 +1,9 @@
 import math
 import torch
+from tqdm import tqdm
 from torch.utils.data import DataLoader
 from transformers import default_data_collator
+from learn_llm._utils_.model_path import ModelPath
 from learn_llm.model.timllm import TimLLM
 from learn_llm.model.tokenizer.minimind_tokenizer import MinimindTokenizer
 from learn_llm.dataset.minimind import get_evaluate_dataset
@@ -75,7 +77,8 @@ def generate_samples(
     model.eval()
 
     results = []
-    for prompt in prompts:
+    progress = tqdm(prompts, desc="生成样本")
+    for prompt in tqdm(progress):
         input_ids = tokenizer.encode(prompt, return_tensors="pt")
         attention_mask = torch.ones_like(input_ids)
 
@@ -135,7 +138,7 @@ def evaluate(
 
 def main():
     evaluate(
-        model_dir="./model_outputs/pretrain/save",
+        model_dir=ModelPath.PRETRAIN_SAVE,
         samples_len=500,
         max_eval_batches=50,
     )    

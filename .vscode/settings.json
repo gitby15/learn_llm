@@ -1,5 +1,5 @@
 {
-    "python.languageServer": "Default",
-    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
-    "basedpyright.disableLanguageServices": true
+    "python.languageServer": "Pylance",
+    "python.analysis.typeCheckingMode": "basic",
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
 }

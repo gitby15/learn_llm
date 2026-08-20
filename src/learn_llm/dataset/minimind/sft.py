@@ -83,7 +83,6 @@ def _get_sft_stream_dataset(
     samples_len: int,
     batch_size: int,
     tokenizer: AutoTokenizer,
-    is_debug:bool = False,
 ) -> StreamingIterableDataset:
     dataset = _download_data()
     dataset = dataset.skip(samples_skip)
@@ -92,7 +91,6 @@ def _get_sft_stream_dataset(
 
     tokenized_dataset = dataset.map(
         lambda x: _tokenize_sft_conversation(x, tokenizer),
-        remove_columns= [] if is_debug else ["conversations"],
         batched=True,
         batch_size=batch_size,
     )
@@ -108,9 +106,8 @@ def get_sft_train_dataset(
     samples_len: int,
     batch_size: int,
     tokenizer: AutoTokenizer,
-    is_debug:bool = False
 ) -> StreamingIterableDataset:
-    return _get_sft_stream_dataset(samples_skip, samples_len, batch_size, tokenizer, is_debug)
+    return _get_sft_stream_dataset(samples_skip, samples_len, batch_size, tokenizer)
 
 
 def get_sft_evaluate_dataset(
@@ -118,9 +115,8 @@ def get_sft_evaluate_dataset(
     samples_len: int,
     batch_size: int,
     tokenizer: AutoTokenizer,
-    is_debug:bool = False
 ) -> StreamingIterableDataset:
-    return _get_sft_stream_dataset(samples_skip, samples_len, batch_size, tokenizer, is_debug)
+    return _get_sft_stream_dataset(samples_skip, samples_len, batch_size, tokenizer)
 
 
 if __name__ == "__main__":
@@ -131,7 +127,6 @@ if __name__ == "__main__":
         samples_len=5,
         batch_size=2,
         tokenizer=tokenizer,
-        is_debug=True,
     )
     for i, sample in enumerate(dataset):
         print(f"=== 第 {i + 1} 条 ===", sample)

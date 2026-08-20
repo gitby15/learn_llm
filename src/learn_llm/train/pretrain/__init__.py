@@ -46,7 +46,8 @@ def train(
         # 学习率相关的参数
         learning_rate=6e-4,
         # 用三角函数，学习率会平滑一些
-        lr_scheduler_type="cosine",
+        lr_scheduler_type="cosine_with_restarts",
+        lr_scheduler_kwargs={"num_cycles": 3},
         warmup_steps=100,
 
         logging_steps=20,
@@ -57,10 +58,6 @@ def train(
         
         dataloader_num_workers=0,
         report_to="none",
-
-        # Todo: 弄清楚这俩是干啥的
-        # remove_unused_columns=False,
-        # dataloader_pin_memory=False,
     )
 
     print(f"Trainer 参数: {training_args}")

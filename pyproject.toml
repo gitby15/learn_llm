@@ -11,6 +11,7 @@ dependencies = [
      "lighteval>=0.13.0",
      "modelscope>=1.39.1",
      "numpy>=2.5.2",
+     "tensorboard>=2.21.0",
      "torch===2.8.0",
      "tqdm>=4.70.0",
      "transformers>=5.15.0",
