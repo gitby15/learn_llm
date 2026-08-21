@@ -43,12 +43,12 @@ class TimLLM(PreTrainedModel, GenerationMixin):
         loss: torch.FloatTensor | None = None
 
         if labels is not None:
-            shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
+            shift_logits = logits[..., :-1, :]
+            shift_labels = labels[..., 1:]
     
             loss = cast(torch.FloatTensor, F.cross_entropy(
-                shift_logits.view(-1, shift_logits.size(-1)),
-                shift_labels.view(-1),
+                shift_logits.reshape(-1, shift_logits.size(-1)),
+                shift_labels.reshape(-1),
             ))
 
         return CausalLMOutputWithPast(

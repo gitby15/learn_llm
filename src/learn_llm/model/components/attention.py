@@ -11,6 +11,7 @@ class Rope(nn.Module):
 
         inv_freq = 1.0 / (self.base ** (torch.arange(0, self.dim, 2).float() / self.dim))
         self.register_buffer("inv_freq", inv_freq)
+        self.inv_freq: torch.Tensor  # 消除 register_buffer 产生的 Tensor | Module 类型歧义
 
     def forward(self, x):
         return self.ropa_embedding(x)
@@ -81,6 +82,18 @@ class GQAAttention(nn.Module):
         return self.w_o(attention_out)
 
 
+class SwiGLUFFN(nn.Module):
+    """SwiGLU 前馈网络：gate_proj + up_proj + down_proj"""
+    def __init__(self, config: TimLLMConfig):
+        super().__init__()
+        self.gate_proj = nn.Linear(config.hidden_size, config.hidden_size * 4, bias=False)
+        self.up_proj = nn.Linear(config.hidden_size, config.hidden_size * 4, bias=False)
+        self.down_proj = nn.Linear(config.hidden_size * 4, config.hidden_size, bias=False)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+
+
 class TransformerBlock(nn.Module):
     """Pre-Norm 结构：残差 + LN + Attention/FFN"""
     def __init__(self, config: TimLLMConfig, rope: Rope):
@@ -89,23 +102,19 @@ class TransformerBlock(nn.Module):
         self.attention = GQAAttention(config, rope)
         self.dropout_attn = nn.Dropout(config.dropout_rate)
         self.layer_norm_2 = nn.LayerNorm(config.hidden_size)
-        self.feed_forward = nn.Sequential(
-            nn.Linear(config.hidden_size, config.hidden_size * 4, bias=False),
-            nn.GELU(),
-            nn.Linear(config.hidden_size * 4, config.hidden_size, bias=False),
-        )
+        self.ffn = SwiGLUFFN(config)
         self.dropout_ffn = nn.Dropout(config.dropout_rate)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        normed = self.layer_norm_1(x)
-        attn_out = self.attention(normed, normed, normed)
-        x = x + self.dropout_attn(attn_out)
+        attn_in = self.layer_norm_1(x)
+        attn_out = self.attention(attn_in, attn_in, attn_in)
+        attn_out = x + self.dropout_attn(attn_out)
 
-        normed = self.layer_norm_2(x)
-        ffn_out = self.feed_forward(normed)
-        x = x + self.dropout_ffn(ffn_out)
+        ffn_in = self.layer_norm_2(attn_out)
+        ffn_out = self.ffn(ffn_in)
+        result = attn_out + self.dropout_ffn(ffn_out)
 
-        return x
+        return result
 
 
 class AttentionLayer(nn.Module):
