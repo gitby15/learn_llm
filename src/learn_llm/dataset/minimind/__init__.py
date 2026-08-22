@@ -1,73 +1,201 @@
-import torch
-from torch.utils.data import Dataset
-from datasets import load_dataset
-from modelscope.hub.file_download import dataset_file_download
-from transformers import AutoTokenizer
+"""
+数据预处理 Pipeline —— 仿 transformers.pipeline 风格，每个节点是独立可调用的 callable 对象。
 
-def _download_data():
-    file_path = dataset_file_download(
-        dataset_id='gongjy/minimind_dataset',
-        file_path='pretrain_t2t_mini.jsonl'
-    )
-    print(f"Minimind Dataset 文件所在路径: {file_path}")
-    return file_path
+节点列表:
+    LoadNode          → 加载原始数据集
+    TokenizeChunkNode → Tokenize + 长文切块
+    SortByLengthNode  → 按长度排序
+    PackDocumentsNode → 文档打包（短文档拼接填满序列）
+    SaveNode          → 保存到磁盘
 
-def tokenize_function(examples, tokenizer, max_length=512):
-    texts = examples["text"]
-    tokenized = tokenizer(
-        texts,
-        truncation=True,
-        max_length=max_length,
-        padding="max_length",
-    )
-    input_ids = tokenized["input_ids"]
-    attention_mask = tokenized["attention_mask"]
-    labels = []
-    for seq_ids, seq_mask in zip(input_ids, attention_mask):
-        seq_labels = [tid if m == 1 else -100 for tid, m in zip(seq_ids, seq_mask)]
-        labels.append(seq_labels)
-    tokenized["labels"] = labels
-    return tokenized
+用法:
+    pipeline = Pipeline([
+        LoadNode(),
+        TokenizeChunkNode(tokenizer),
+        SortByLengthNode(),
+        PackDocumentsNode(tokenizer, max_length=16384),
+        SaveNode(output_dir),
+    ])
+    pipeline.run()
+"""
 
+import os
+import time
+from abc import ABC, abstractmethod
+from datasets import load_dataset, Dataset
+from learn_llm.model.tokenizer.minimind_tokenizer import MinimindTokenizer
 
-class StreamingIterableDataset(torch.utils.data.IterableDataset):
-    def __init__(self, iterable_dataset, length=None):
-        self.dataset = iterable_dataset
-        self._length = length
-
-    def __len__(self):
-        if self._length is not None:
-            return self._length
-        raise TypeError(f"{type(self).__name__} has no length; pass `length` to constructor")
-
-    def __iter__(self):
-        yield from self.dataset
+_CWD_DIR = os.getcwd()
+OUTPUT_DIR = os.path.join(_CWD_DIR, "data_outputs", "wikipedia")
+MAX_LENGTH = 16384
+MIN_CHUNK_LENGTH = 50
 
 
-# 是一个很大的jsonl
-def _get_stream_dataset(
-        samples_skip:int,
-        samples_len: int,
-        batch_size: int,
-        tokenizer: AutoTokenizer,
-    ) -> StreamingIterableDataset:
-    data_files = _download_data()
-    dataset = load_dataset('json', data_files=data_files, split='train', streaming=True)
-    dataset = dataset.skip(samples_skip)
-    if samples_len >= 0:
-        dataset = dataset.take(samples_len)
+# ---- 节点基类 ----
 
-    tokenized_dataset = dataset.map(
-        lambda x: tokenize_function(x, tokenizer),
-        batched=True,
-        batch_size=batch_size,
-        remove_columns=["text"],
-    )
-    train_dataset = StreamingIterableDataset(tokenized_dataset, length=samples_len if samples_len >= 0 else None)
-    return train_dataset
+class PipelineNode(ABC):
+    """仿 transformers.pipeline 的节点基类，每个节点是一个 callable"""
+    name: str = "node"
 
-def get_train_dataset(samples_skip:int, samples_len: int, batch_size: int, tokenizer: AutoTokenizer) -> StreamingIterableDataset:
-    return _get_stream_dataset(samples_skip, samples_len, batch_size, tokenizer)
+    @abstractmethod
+    def __call__(self, dataset: Dataset | None) -> Dataset:
+        ...
 
-def get_evaluate_dataset(samples_skip:int, samples_len: int, batch_size: int, tokenizer: AutoTokenizer) -> StreamingIterableDataset:
-    return _get_stream_dataset(samples_skip, samples_len, batch_size, tokenizer)
+
+# ---- 各节点实现 ----
+
+class LoadNode(PipelineNode):
+    name = "load"
+
+    def __init__(self, dataset_path: str = "wikimedia/wikipedia",
+                 dataset_name: str = "20231101.zh", split: str = "train"):
+        self.dataset_path = dataset_path
+        self.dataset_name = dataset_name
+        self.split = split
+
+    def __call__(self, _dataset: None = None) -> Dataset:
+        dataset = load_dataset(
+            path=self.dataset_path,
+            name=self.dataset_name,
+            split=self.split,
+            streaming=False,
+        )
+        print(f"  加载完成，共 {len(dataset)} 篇")
+        return dataset
+
+
+class TokenizeChunkNode(PipelineNode):
+    name = "tokenize_chunk"
+
+    def __init__(self, tokenizer=None, max_length: int = MAX_LENGTH,
+                 min_chunk: int = MIN_CHUNK_LENGTH, batch_size: int = 1024):
+        self.tokenizer = tokenizer or MinimindTokenizer.get_tokenizer()
+        self.max_length = max_length
+        self.min_chunk = min_chunk
+        self.batch_size = batch_size
+
+    def __call__(self, dataset: Dataset) -> Dataset:
+        max_len, min_chunk = self.max_length, self.min_chunk
+
+        def _fn(examples):
+            all_ids = []
+            for text in examples["text"]:
+                token_ids = self.tokenizer.encode(text, add_special_tokens=False)
+                for i in range(0, len(token_ids), max_len):
+                    chunk = token_ids[i:i + max_len]
+                    if len(chunk) >= min_chunk:
+                        all_ids.append(chunk)
+            return {"input_ids": all_ids}
+
+        tokenized = dataset.map(
+            _fn,
+            batched=True,
+            batch_size=self.batch_size,
+            num_proc=os.cpu_count(),
+            remove_columns=dataset.column_names,
+        )
+        print(f"  Tokenize + 切块完成，共 {len(tokenized)} 条")
+        return tokenized
+
+
+class SortByLengthNode(PipelineNode):
+    name = "sort"
+
+    def __call__(self, dataset: Dataset) -> Dataset:
+        lengths = [len(ids) for ids in dataset["input_ids"]]
+        sorted_idx = sorted(range(len(lengths)), key=lambda i: lengths[i])
+        dataset = dataset.select(sorted_idx)
+        print(f"  排序完成，最短: {lengths[sorted_idx[0]]}, 最长: {lengths[sorted_idx[-1]]}")
+        return dataset
+
+
+class PackDocumentsNode(PipelineNode):
+    name = "pack"
+
+    def __init__(self, tokenizer=None, max_length: int = MAX_LENGTH):
+        self.tokenizer = tokenizer or MinimindTokenizer.get_tokenizer()
+        self.max_length = max_length
+
+    def __call__(self, dataset: Dataset) -> Dataset:
+        def _gen():
+            eos = self.tokenizer.eos_token_id
+            max_len = self.max_length
+            current, current_len = [], 0
+
+            for ids in dataset["input_ids"]:
+                need = len(ids) + (1 if current else 0)
+                if current_len + need <= max_len:
+                    if current:
+                        current.append(eos)
+                    current.extend(ids)
+                    current_len += need
+                else:
+                    if current:
+                        yield {"input_ids": current}
+                    current = list(ids)
+                    current_len = len(ids)
+
+            if current:
+                yield {"input_ids": current}
+
+        result = Dataset.from_generator(_gen)
+        print(f"  打包完成: {len(result)} 条")
+        return result
+
+
+class SaveNode(PipelineNode):
+    name = "save"
+
+    def __init__(self, output_dir: str = OUTPUT_DIR):
+        self.output_dir = output_dir
+
+    def __call__(self, dataset: Dataset) -> Dataset:
+        dataset.save_to_disk(self.output_dir)
+        return dataset
+
+
+# ---- Pipeline 编排 ----
+
+class Pipeline:
+    """将多个 PipelineNode 串联执行。"""
+
+    def __init__(self, nodes: list[PipelineNode]):
+        self.nodes = nodes
+
+    def run(self, skip_if_exists: bool = False):
+        if skip_if_exists and os.path.exists(OUTPUT_DIR):
+            print(f"[跳过] 数据已存在: {OUTPUT_DIR}")
+            return
+        dataset = None
+        for node in self.nodes:
+            t0 = time.time()
+            print(f"\n[{node.name}] 开始...")
+            dataset = node(dataset)
+            print(f"[{node.name}] 完成，耗时 {time.time() - t0:.1f}s")
+        print(f"\n流水线完成")
+
+
+# ---- 默认流水线 ----
+
+def _default_pipeline() -> Pipeline:
+    tokenizer = MinimindTokenizer.get_tokenizer()
+    return Pipeline([
+        LoadNode(),
+        TokenizeChunkNode(tokenizer),
+        SortByLengthNode(),
+        PackDocumentsNode(tokenizer),
+        SaveNode(OUTPUT_DIR),
+    ])
+
+
+def get_train_dataset() -> Dataset:
+    """加载预处理好的训练数据（不存在时自动生成）。"""
+    if not os.path.exists(OUTPUT_DIR):
+        print("预处理数据不存在，开始流水线...")
+        _default_pipeline().run()
+    return Dataset.load_from_disk(OUTPUT_DIR)
+
+
+if __name__ == "__main__":
+    a = get_train_dataset()
+    # print(a)

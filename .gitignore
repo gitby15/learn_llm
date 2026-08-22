@@ -16,3 +16,5 @@ trained_model_old/
 sft_model/
 sft_checkpoints/
 model_outputs/
+data_outputs/
+logs/

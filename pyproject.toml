@@ -9,6 +9,7 @@ dependencies = [
      "bottle>=0.13.4",
      "datasets>=5.0.1",
      "lighteval>=0.13.0",
+     "lm-eval>=0.4.12",
      "modelscope>=1.39.1",
      "numpy>=2.5.2",
      "tensorboard>=2.21.0",
