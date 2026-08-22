@@ -17,8 +17,6 @@ def train(resume_dir: str):
         )
         model = TimLLM(config)
 
-    # Batch 128在执行的过程中，大概会吃掉18GB的显存
-    
     train_dataset = get_train_dataset()
     # Todo: 弄清楚这个是干啥的
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
@@ -28,7 +26,7 @@ def train(resume_dir: str):
         output_dir=ModelPath.PRETRAIN_CHECKPOINT,
         save_total_limit=2,
 
-        num_train_epochs=3, # 训练轮数
+        num_train_epochs=1, # 训练轮数
 
         auto_find_batch_size=True,
         gradient_accumulation_steps=4,
@@ -48,8 +46,12 @@ def train(resume_dir: str):
         fp16=torch.cuda.is_available(),
         report_to="tensorboard",
         dataloader_num_workers=4,
+
+        # torch_compile=True,
+        
     )
 
+    print("开始训练：")
     trainer = Trainer(
         model=model,
         args=training_args,

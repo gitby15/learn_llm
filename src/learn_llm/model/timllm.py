@@ -69,8 +69,17 @@ class TimLLM(PreTrainedModel, GenerationMixin):
         super().tie_weights(**kwargs)
         if self.config.tie_word_embeddings:
             self.lm_head.weight = self.embedding.weight
+    def get_size(self) -> int:
+        return sum(p.numel() for p in self.parameters())
 
 
+def calculate_model_size():
+    from learn_llm.model.tokenizer.minimind_tokenizer import MinimindTokenizer
+    tokenize = MinimindTokenizer.get_tokenizer()
+    config = TimLLMConfig(vocab_size=tokenize.vocab_size)
+    model = TimLLM(config)
+    size = model.get_size()
+    print(f"模型大小: {size / 1e6} MB")
 
 def test():
     from learn_llm.model.model_config import TimLLMConfig
@@ -82,4 +91,4 @@ def test():
     print(output)
 
 if __name__ == "__main__":
-    test()
+    calculate_model_size()

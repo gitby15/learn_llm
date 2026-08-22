@@ -86,9 +86,10 @@ class SwiGLUFFN(nn.Module):
     """SwiGLU 前馈网络：gate_proj + up_proj + down_proj"""
     def __init__(self, config: TimLLMConfig):
         super().__init__()
-        self.gate_proj = nn.Linear(config.hidden_size, config.hidden_size * 4, bias=False)
-        self.up_proj = nn.Linear(config.hidden_size, config.hidden_size * 4, bias=False)
-        self.down_proj = nn.Linear(config.hidden_size * 4, config.hidden_size, bias=False)
+        expanded_size = int(config.hidden_size * 8 / 3)
+        self.gate_proj = nn.Linear(config.hidden_size, expanded_size, bias=False)
+        self.up_proj = nn.Linear(config.hidden_size, expanded_size, bias=False)
+        self.down_proj = nn.Linear(expanded_size, config.hidden_size, bias=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
@@ -98,10 +99,10 @@ class TransformerBlock(nn.Module):
     """Pre-Norm 结构：残差 + LN + Attention/FFN"""
     def __init__(self, config: TimLLMConfig, rope: Rope):
         super().__init__()
-        self.layer_norm_1 = nn.LayerNorm(config.hidden_size)
+        self.layer_norm_1 = nn.RMSNorm(config.hidden_size)
         self.attention = GQAAttention(config, rope)
         self.dropout_attn = nn.Dropout(config.dropout_rate)
-        self.layer_norm_2 = nn.LayerNorm(config.hidden_size)
+        self.layer_norm_2 = nn.RMSNorm(config.hidden_size)
         self.ffn = SwiGLUFFN(config)
         self.dropout_ffn = nn.Dropout(config.dropout_rate)
 
@@ -124,7 +125,7 @@ class AttentionLayer(nn.Module):
             TransformerBlock(config, Rope(config))
             for _ in range(config.num_hidden_layers)
         ])
-        self.final_norm = nn.LayerNorm(config.hidden_size)
+        self.final_norm = nn.RMSNorm(config.hidden_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         attention_output = x
