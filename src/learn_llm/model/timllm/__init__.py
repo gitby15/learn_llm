@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from transformers import GenerationMixin, PreTrainedModel
 from transformers.modeling_outputs import CausalLMOutputWithPast
-from learn_llm.model.model_config import TimLLMConfig
+from learn_llm.model.timllm.model_config import TimLLMConfig
 from learn_llm.model.components.attention import AttentionLayer
 
 class TimLLM(PreTrainedModel, GenerationMixin):
@@ -82,7 +82,7 @@ def calculate_model_size():
     print(f"模型大小: {size / 1e6} MB")
 
 def test():
-    from learn_llm.model.model_config import TimLLMConfig
+    from learn_llm.model.timllm.model_config import TimLLMConfig
     config = TimLLMConfig(vocab_size=100)
     timllm = TimLLM(config)
     input = torch.randint(1, 10, (1, 10), dtype=torch.long)

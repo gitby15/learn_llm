@@ -1,8 +1,7 @@
 from transformers import Trainer, TrainingArguments, DataCollatorForSeq2Seq
 from learn_llm.model.timllm import TimLLM
-from learn_llm.model.model_config import TimLLMConfig
 from learn_llm.model.tokenizer.minimind_tokenizer import MinimindTokenizer
-from learn_llm.dataset.minimind.sft import get_sft_train_dataset
+from learn_llm.dataset.wikipedia.sft import get_sft_train_dataset
 from learn_llm._utils_.model_path import ModelPath
 import torch
 

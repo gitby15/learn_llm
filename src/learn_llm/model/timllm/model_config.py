@@ -11,7 +11,7 @@ class TimLLMConfig(PreTrainedConfig):
         gqa_head_dim: int = 128,
         num_attention_heads: int = 4,
         num_key_value_heads: int = 2,
-        max_position_embeddings: int = 16384,
+        max_position_embeddings: int = 512,
         rope_freq: int = 10000,
         dropout_rate: float = 0.1,
         tie_word_embeddings=True,

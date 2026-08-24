@@ -1,7 +1,11 @@
 from datasets import load_dataset
 from modelscope.hub.file_download import dataset_file_download
 from transformers import AutoTokenizer
-from learn_llm.dataset.minimind import StreamingIterableDataset
+from learn_llm._utils_.pipeline import PipelineNode
+from learn_llm.dataset.wikipedia import StreamingIterableDataset
+
+
+
 
 def _download_data():
     data_files = dataset_file_download(
@@ -62,7 +66,7 @@ def _tokenize_single_conversation(conversations, tokenizer, max_length=512):
     }
 
 
-def _tokenize_sft_conversation(examples, tokenizer, max_length=16384):
+def _tokenize_sft_conversation(examples, tokenizer, max_length=1024):
     """batch 版本的 tokenize，处理一批 conversations。"""
     all_input_ids = []
     all_labels = []

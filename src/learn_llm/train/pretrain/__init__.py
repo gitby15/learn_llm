@@ -1,13 +1,12 @@
 from transformers import Trainer, TrainingArguments, DataCollatorForLanguageModeling
 from learn_llm._utils_.model_path import ModelPath
 from learn_llm.model.timllm import TimLLM
-from learn_llm.model.model_config import TimLLMConfig
+from learn_llm.model.timllm.model_config import TimLLMConfig
 from learn_llm.model.tokenizer.minimind_tokenizer import MinimindTokenizer
-from learn_llm.dataset.minimind import get_train_dataset
+from learn_llm.dataset.wikipedia import get_train_dataset
 import torch
 
 def train(resume_dir: str):
-
     tokenizer = MinimindTokenizer.get_tokenizer()
     model = ModelPath.get_exist_model(TimLLM, resume_dir)
     if model is None:
@@ -20,13 +19,11 @@ def train(resume_dir: str):
     train_dataset = get_train_dataset()
     # Todo: 弄清楚这个是干啥的
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
-
     training_args = TrainingArguments(
-        
         output_dir=ModelPath.PRETRAIN_CHECKPOINT,
         save_total_limit=2,
 
-        num_train_epochs=1, # 训练轮数
+        num_train_epochs=3, # 训练轮数
 
         auto_find_batch_size=True,
         gradient_accumulation_steps=4,
@@ -46,9 +43,7 @@ def train(resume_dir: str):
         fp16=torch.cuda.is_available(),
         report_to="tensorboard",
         dataloader_num_workers=4,
-
-        # torch_compile=True,
-        
+        torch_compile=True,
     )
 
     print("开始训练：")
@@ -63,7 +58,6 @@ def train(resume_dir: str):
         trainer.train()
     except KeyboardInterrupt:
         print("\n训练被手动中断，正在保存当前模型...")
-
 
     trainer.save_model(ModelPath.PRETRAIN_SAVE)
     tokenizer.save_pretrained(ModelPath.PRETRAIN_SAVE)

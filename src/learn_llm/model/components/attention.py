@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from learn_llm.model.model_config import TimLLMConfig
+from learn_llm.model.timllm.model_config import TimLLMConfig
 
 class Rope(nn.Module):
     def __init__(self, config: TimLLMConfig):
@@ -136,7 +136,7 @@ class AttentionLayer(nn.Module):
 
 
 if __name__ == "__main__":
-    from learn_llm.model.model_config import TimLLMConfig
+    from learn_llm.model.timllm.model_config import TimLLMConfig
     config = TimLLMConfig(vocab_size=100000)
     rope = Rope(config)
     print(rope)
