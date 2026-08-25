@@ -92,3 +92,46 @@ class SaveNode(PipelineNode):
     def __call__(self, dataset: Dataset) -> Dataset:
         dataset.save_to_disk(self.output_dir)
         return dataset
+
+
+class PackDocumentsNode(PipelineNode):
+    name = "pack"
+
+    def __init__(self, tokenizer: AutoTokenizer, context_max_len: int):
+        self.tokenizer = tokenizer
+        self.context_max_len = context_max_len
+        pass
+
+    def __call__(self, dataset: Dataset) -> Dataset:
+        def _gen():
+            _eos = self.tokenizer.eos_token_id
+            max_len = self.context_max_len
+            current = []
+            quota = max_len
+
+            for ids in dataset['input_ids']:
+                point = 0
+                while True:
+                    if quota <= 0: # quota用完了，就 yield 当前的 current
+                        result = current
+                        current = []
+                        quota = max_len
+                        yield {"input_ids": result}
+                        break
+                    if point >= len(ids) - 1: # ids 用完了，标记结束，并break到下一个ids
+                        current.append(_eos)
+                        quota -= 1
+                        break
+
+                    insert_len = min(quota, len(ids) - point - 1)
+                    current.extend(ids[point:point + insert_len])
+                    point += insert_len
+                    quota -= insert_len
+
+            if current:
+                yield {"input_ids": current}
+
+        result = Dataset.from_generator(_gen)
+        
+        print(f"  打包完成: {len(result)} 条, 平均每条长度: {sum(len(ids) for ids in result['input_ids']) /len(result):.2f}")
+        return result

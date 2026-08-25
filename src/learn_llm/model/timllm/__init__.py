@@ -32,17 +32,8 @@ def test():
     output = timllm(input_ids=input, labels=label)
     print(output)
 
-if __name__ == "__main__":
-    # calculate_model_size()
-    from learn_llm.model.timllm.modeling_timllm import TimLLM
-    from learn_llm.tokenizer.babylm_zho import get_tokenizer
-    tokenizer = get_tokenizer()
-    config = TimLLMConfig(vocab_size=tokenizer.vocab_size)
-    model = TimLLM(config)
 
-    input_ids = torch.randint(0, min(tokenizer.vocab_size, 1000), (2, 128), dtype=torch.long)
-    with torch.no_grad():
-        out = model(input_ids=input_ids, labels=input_ids)
-    print(f"loss: {out.loss.item():.2f}")
-    print(f"logits mean: {out.logits.mean():.4f}, std: {out.logits.std():.4f}")
-    print(f"logits min: {out.logits.min():.4f}, max: {out.logits.max():.4f}")
+
+if __name__ == "__main__":
+    calculate_model_size()
+   

@@ -2,10 +2,18 @@ from tokenizers import Tokenizer, models, pre_tokenizers, trainers, decoders
 from transformers import PreTrainedTokenizerFast
 from datasets import Dataset
 
+
+SPECIAL_TOKEN = [
+    "<|endoftext|>",   # EOS / 文档结束
+    "<|pad|>",          # 填充
+    "<|im_start|>",     # 对话轮次开始
+    "<|im_end|>",       # 对话轮次结束
+]
+
 def train(
         folder_dir: str,
         dataset: Dataset,
-        vocab_size: int = 60000,
+        vocab_size: int = 6480,
         min_frequency:int = 10,
 ):
     tokenizer = Tokenizer(models.BPE())
@@ -17,9 +25,9 @@ def train(
     trainer = trainers.BpeTrainer(
         vocab_size=vocab_size,
         min_frequency=min_frequency,
-        special_tokens=["<|endoftext|>", "<|pad|>"],
+        special_tokens=SPECIAL_TOKEN,
     )
-    tokenizer.train_from_iterator(dataset, trainer)
+    tokenizer.train_from_iterator(dataset['text'], trainer)
 
     # 包装为 PreTrainedTokenizerFast，这样保存后会生成：
     #   - tokenizer.json          (核心词表/merges)
@@ -31,6 +39,7 @@ def train(
         bos_token=None,
         eos_token="<|endoftext|>",
         pad_token="<|pad|>",
+        additional_special_tokens=["<|im_start|>", "<|im_end|>"],
     )
     wrapped.save_pretrained(folder_dir)
     # 打印词表长度、训练时间、训练数据量

@@ -1,7 +1,7 @@
 import os
 from datasets import Dataset
 from transformers import AutoTokenizer
-from learn_llm._utils_.pipeline import Pipeline, LoadNode, SaveNode, PipelineNode
+from learn_llm._utils_.pipeline import Pipeline, LoadNode, SaveNode, PackDocumentsNode , PipelineNode
 
 _CWD_DIR = os.getcwd()
 OUTPUT_DIR = os.path.join(_CWD_DIR, "data_outputs", "wikipedia")
@@ -60,44 +60,6 @@ class SortByLengthNode(PipelineNode):
         return dataset
 
 
-class PackDocumentsNode(PipelineNode):
-    name = "pack"
-
-    def __init__(self, tokenizer: AutoTokenizer, max_length: int):
-        self.tokenizer = tokenizer
-        self.max_length = max_length
-
-    def __call__(self, dataset: Dataset) -> Dataset:
-        def _gen():
-            eos = self.tokenizer.eos_token_id
-            max_len = self.max_length
-            current, current_len = [], 0
-
-            for ids in dataset["input_ids"]:
-                need = len(ids) + (1 if current else 0)
-                if current_len + need <= max_len:
-                    if current:
-                        current.append(eos)
-                    current.extend(ids)
-                    current_len += need
-                else:
-                    if current:
-                        yield {"input_ids": current}
-                    current = list(ids)
-                    current_len = len(ids)
-
-            if current:
-                yield {"input_ids": current}
-
-        result = Dataset.from_generator(_gen)
-        print(f"  打包完成: {len(result)} 条")
-        return result
-
-
-
-
-
-
 def get_tokenizer_dataset(take_len: int = None) -> Dataset:
     pipeline = Pipeline(
         [
@@ -143,7 +105,7 @@ def get_train_dataset(
             SortByLengthNode(),
             PackDocumentsNode(
                 tokenizer=tokenizer,
-                max_length=context_max_len
+                context_max_len=context_max_len
             ),
             SaveNode(output_dir=OUTPUT_DIR),
         ]

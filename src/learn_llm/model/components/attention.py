@@ -38,6 +38,8 @@ class GQAAttention(nn.Module):
         self.w_k = nn.Linear(config.hidden_size, self.num_key_value_heads * self.head_dim, bias=False)
         self.w_v = nn.Linear(config.hidden_size, self.num_key_value_heads * self.head_dim, bias=False)
         self.w_o = nn.Linear(self.num_attention_heads * self.head_dim, config.hidden_size, bias=False)
+        self.q_norm = nn.RMSNorm(self.head_dim)
+        self.k_norm = nn.RMSNorm(self.head_dim)
         self.rope = rope
 
 
@@ -55,12 +57,14 @@ class GQAAttention(nn.Module):
         query = self.w_q(q)
         # [B, T, C] -> [B, T, H, D] -> [B, H, T, D]
         query = query.reshape(b, t_q, self.num_attention_heads, self.head_dim).transpose(1, 2)
+        query = self.q_norm(query)
         query = self.rope(query)
         
 
         key = self.w_k(k)
         # [B, T, C] -> [B, T, H, D] -> [B, H, T, D]
         key = key.reshape(b, t_kv, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        key = self.k_norm(key)
         key = self.rope(key)
 
         value = self.w_v(v)
