@@ -1,57 +1,54 @@
 from transformers import Trainer, TrainingArguments, DataCollatorForLanguageModeling
+from datasets import concatenate_datasets
 from learn_llm._utils_.model_path import ModelPath
 from learn_llm.model.timllm import TimLLM
-from learn_llm.model.model_config import TimLLMConfig
-from learn_llm.model.tokenizer.minimind_tokenizer import MinimindTokenizer
-from learn_llm.dataset.minimind import get_train_dataset
-import torch
+from learn_llm.model.timllm.model_config import TimLLMConfig
+from learn_llm.tokenizer.babylm_zho import get_tokenizer
+from learn_llm.dataset.babylm.babylm_zho import get_train_dataset as get_babylm_data
+from learn_llm.dataset.wikipedia import get_train_dataset as get_wiki_data
 
-def train(resume_dir: str):
 
-    tokenizer = MinimindTokenizer.get_tokenizer()
-    model = ModelPath.get_exist_model(TimLLM, resume_dir)
+def train():
+    TimLLMConfig.register_for_auto_class("AutoConfig")
+    TimLLM.register_for_auto_class("AutoModelForCausalLM")
+
+    tokenizer = get_tokenizer()
+
+    model = ModelPath.get_latest_checkpoint_model(TimLLM, ModelPath.PRETRAIN_CHECKPOINT)
+    is_resume = True
     if model is None:
         print("从头开始训练")
-        config = TimLLMConfig(
-            vocab_size=tokenizer.vocab_size,
-        )
+        is_resume = False
+        config = TimLLMConfig(vocab_size=tokenizer.vocab_size)
         model = TimLLM(config)
 
-    train_dataset = get_train_dataset()
-    # Todo: 弄清楚这个是干啥的
+    max_len = model.config.max_position_embeddings
+    tokenizer.model_max_length = max_len
+
+    # BabyLM 在前，Wikipedia 在后，一次训练自动按顺序学习
+    baby_dataset = get_babylm_data(tokenizer=tokenizer, context_max_len=max_len)
+    wiki_dataset = get_wiki_data(tokenizer=tokenizer, context_max_len=max_len)
+    train_dataset = concatenate_datasets([baby_dataset, wiki_dataset])
+
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
     training_args = TrainingArguments(
-        
         output_dir=ModelPath.PRETRAIN_CHECKPOINT,
-        save_total_limit=2,
-
-        num_train_epochs=1, # 训练轮数
-
+        save_total_limit=5,
+        num_train_epochs=1,
         auto_find_batch_size=True,
-        gradient_accumulation_steps=4,
-        # train_sampling_strategy="group_by_length", # 按长度分组采样，减少不必要的padding
-
-        # 学习率相关的参数
-        learning_rate=5e-4,
-        # 用三角函数，学习率会平滑一些
-        lr_scheduler_type="cosine_with_restarts",
-        lr_scheduler_kwargs={"num_cycles": 5},
-        warmup_steps=100,
-
+        learning_rate=3e-4,
+        lr_scheduler_type="cosine",
+        warmup_steps=500,
         logging_steps=30,
         save_steps=400,
-
-        # 有 GPU 时开启混合精度
-        fp16=torch.cuda.is_available(),
+        fp16=True,
+        max_grad_norm=1.0,
         report_to="tensorboard",
-        dataloader_num_workers=4,
-
-        # torch_compile=True,
-        
+        dataloader_num_workers=8,
+        torch_compile=True,
     )
 
-    print("开始训练：")
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -60,17 +57,18 @@ def train(resume_dir: str):
     )
 
     try:
-        trainer.train()
+        trainer.train(resume_from_checkpoint=is_resume)
     except KeyboardInterrupt:
-        print("\n训练被手动中断，正在保存当前模型...")
-
+        print("\n训练被手动中断，正在保存 checkpoint...")
+        trainer._save_checkpoint(model)
+        return
 
     trainer.save_model(ModelPath.PRETRAIN_SAVE)
     tokenizer.save_pretrained(ModelPath.PRETRAIN_SAVE)
 
 
 def main():
-    train(resume_dir=ModelPath.PRETRAIN_SAVE)
+    train()
 
 if __name__ == "__main__":
     main()

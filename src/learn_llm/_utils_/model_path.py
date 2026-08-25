@@ -21,3 +21,18 @@ class ModelPath:
         except:
             print(f"模型 {model_dir} 不存在, 返回空")
             return None
+
+    @staticmethod
+    def get_latest_checkpoint_model(model_class: type[PreTrainedModel], checkpoint_dir: str) -> PreTrainedModel | None:
+        """从 checkpoint 目录中自动找到最新的 checkpoint 并加载模型"""
+        if not os.path.isdir(checkpoint_dir):
+            return None
+        checkpoints = sorted(
+            [d for d in os.listdir(checkpoint_dir) if d.startswith("checkpoint-")],
+            key=lambda x: int(x.split("-")[1]),
+        )
+        if not checkpoints:
+            return None
+        latest = os.path.join(checkpoint_dir, checkpoints[-1])
+        print(f"加载最新 checkpoint: {latest}")
+        return model_class.from_pretrained(latest)

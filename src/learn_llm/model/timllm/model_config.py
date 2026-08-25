@@ -6,14 +6,14 @@ class TimLLMConfig(PreTrainedConfig):
 
     def __init__(
         self,
-        vocab_size: int = 6400,
-        num_hidden_layers: int = 6,
+        vocab_size: int = 6480,
+        num_hidden_layers: int = 8,
         gqa_head_dim: int = 128,
-        num_attention_heads: int = 4,
+        num_attention_heads: int = 8,
         num_key_value_heads: int = 2,
-        max_position_embeddings: int = 16384,
+        max_position_embeddings: int = 2048,
         rope_freq: int = 10000,
-        dropout_rate: float = 0.1,
+        dropout_rate: float = 0.05,
         tie_word_embeddings=True,
         **kwargs,
     ):

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from learn_llm.model.model_config import TimLLMConfig
+from learn_llm.model.timllm.model_config import TimLLMConfig
 
 class Rope(nn.Module):
     def __init__(self, config: TimLLMConfig):
@@ -14,18 +14,15 @@ class Rope(nn.Module):
         self.inv_freq: torch.Tensor  # 消除 register_buffer 产生的 Tensor | Module 类型歧义
 
     def forward(self, x):
-        return self.ropa_embedding(x)
+        return self.rope_embedding(x)
 
-    def ropa_embedding(self, x):
+    def rope_embedding(self, x):
         seq_len = x.size(-2)
         t = torch.arange(seq_len, device=x.device, dtype=x.dtype)
         freqs = torch.outer(t, self.inv_freq.to(x.device))
         emb = torch.cat((freqs, freqs), dim=-1)
-        cos = emb.cos()
-        sin = emb.sin()
-        while cos.dim() < x.dim():
-            cos = cos.unsqueeze(0)
-            sin = sin.unsqueeze(0)
+        cos = emb.cos().unsqueeze(0).unsqueeze(0)  # [1, 1, T, D]
+        sin = emb.sin().unsqueeze(0).unsqueeze(0)
         x_rotated = torch.cat((-x[..., self.dim // 2:], x[..., :self.dim // 2]), dim=-1)
         return x * cos + x_rotated * sin
 
@@ -41,6 +38,8 @@ class GQAAttention(nn.Module):
         self.w_k = nn.Linear(config.hidden_size, self.num_key_value_heads * self.head_dim, bias=False)
         self.w_v = nn.Linear(config.hidden_size, self.num_key_value_heads * self.head_dim, bias=False)
         self.w_o = nn.Linear(self.num_attention_heads * self.head_dim, config.hidden_size, bias=False)
+        self.q_norm = nn.RMSNorm(self.head_dim)
+        self.k_norm = nn.RMSNorm(self.head_dim)
         self.rope = rope
 
 
@@ -58,12 +57,14 @@ class GQAAttention(nn.Module):
         query = self.w_q(q)
         # [B, T, C] -> [B, T, H, D] -> [B, H, T, D]
         query = query.reshape(b, t_q, self.num_attention_heads, self.head_dim).transpose(1, 2)
+        query = self.q_norm(query)
         query = self.rope(query)
         
 
         key = self.w_k(k)
         # [B, T, C] -> [B, T, H, D] -> [B, H, T, D]
         key = key.reshape(b, t_kv, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        key = self.k_norm(key)
         key = self.rope(key)
 
         value = self.w_v(v)
@@ -118,6 +119,9 @@ class TransformerBlock(nn.Module):
         return result
 
 
+
+
+
 class AttentionLayer(nn.Module):
     def __init__(self, config: TimLLMConfig):
         super().__init__()
@@ -136,7 +140,7 @@ class AttentionLayer(nn.Module):
 
 
 if __name__ == "__main__":
-    from learn_llm.model.model_config import TimLLMConfig
+    from learn_llm.model.timllm.model_config import TimLLMConfig
     config = TimLLMConfig(vocab_size=100000)
     rope = Rope(config)
     print(rope)

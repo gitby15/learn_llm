@@ -5,8 +5,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from transformers import GenerationMixin, PreTrainedModel
 from transformers.modeling_outputs import CausalLMOutputWithPast
-from learn_llm.model.model_config import TimLLMConfig
+
 from learn_llm.model.components.attention import AttentionLayer
+from learn_llm.model.timllm.model_config import TimLLMConfig
+
 
 class TimLLM(PreTrainedModel, GenerationMixin):
     config_class = TimLLMConfig
@@ -26,9 +28,8 @@ class TimLLM(PreTrainedModel, GenerationMixin):
         self,
         input_ids: torch.LongTensor,
         labels: torch.LongTensor | None = None,
-        **kwargs, # Todo: 研究一下transformer框架都会传什么东西进来
+        **kwargs,  # Todo: 研究一下transformer框架都会传什么东西进来
     ) -> CausalLMOutputWithPast:
-
         # 1. Embedding: [B, T] -> [B, T, C]
         hidden_states = self.embedding(input_ids)
         hidden_states = self.dropout_embed(hidden_states)
@@ -45,7 +46,7 @@ class TimLLM(PreTrainedModel, GenerationMixin):
         if labels is not None:
             shift_logits = logits[..., :-1, :]
             shift_labels = labels[..., 1:]
-    
+
             loss = cast(torch.FloatTensor, F.cross_entropy(
                 shift_logits.reshape(-1, shift_logits.size(-1)),
                 shift_labels.reshape(-1),
@@ -69,26 +70,12 @@ class TimLLM(PreTrainedModel, GenerationMixin):
         super().tie_weights(**kwargs)
         if self.config.tie_word_embeddings:
             self.lm_head.weight = self.embedding.weight
-    def get_size(self) -> int:
-        return sum(p.numel() for p in self.parameters())
 
-
-def calculate_model_size():
-    from learn_llm.model.tokenizer.minimind_tokenizer import MinimindTokenizer
-    tokenize = MinimindTokenizer.get_tokenizer()
-    config = TimLLMConfig(vocab_size=tokenize.vocab_size)
-    model = TimLLM(config)
-    size = model.get_size()
-    print(f"模型大小: {size / 1e6} MB")
-
-def test():
-    from learn_llm.model.model_config import TimLLMConfig
-    config = TimLLMConfig(vocab_size=100)
-    timllm = TimLLM(config)
-    input = torch.randint(1, 10, (1, 10), dtype=torch.long)
-    label = torch.ones(1, 10, dtype=torch.long)
-    output = timllm(input_ids=input, labels=label)
-    print(output)
-
-if __name__ == "__main__":
-    calculate_model_size()
+    def get_size(self) -> tuple[int, dict[str, int]]:
+        total_size = 0
+        sub_module_size = {}
+        for name, module in self.named_modules():
+            if isinstance(module, nn.Module):
+                sub_module_size[name] = sum(p.numel() for p in module.parameters(recurse=False))
+                total_size += sub_module_size[name]
+        return total_size, sub_module_size

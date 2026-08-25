@@ -5,7 +5,7 @@ from transformers import AutoConfig, AutoModelForCausalLM
 from lm_eval.models.huggingface import HFLM
 from learn_llm._utils_.model_path import ModelPath
 from learn_llm.model.timllm import TimLLM
-from learn_llm.model.model_config import TimLLMConfig
+from learn_llm.model.timllm.model_config import TimLLMConfig
 from learn_llm.model.tokenizer.minimind_tokenizer import MinimindTokenizer
 
 # 注册自定义模型，使 AutoModel 能识别 timllm 类型
