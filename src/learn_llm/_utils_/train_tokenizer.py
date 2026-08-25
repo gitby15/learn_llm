@@ -1,0 +1,39 @@
+from tokenizers import Tokenizer, models, pre_tokenizers, trainers, decoders
+from transformers import PreTrainedTokenizerFast
+from datasets import Dataset
+
+def train(
+        folder_dir: str,
+        dataset: Dataset,
+        vocab_size: int = 60000,
+        min_frequency:int = 10,
+):
+    tokenizer = Tokenizer(models.BPE())
+    # 关键：ByteLevel pre-tokenizer 会把所有文本映射到字节层面
+    tokenizer.pre_tokenizer = pre_tokenizers.ByteLevel()
+    # ByteLevel 解码器，和 pre_tokenizer 配套使用
+    tokenizer.decoder = decoders.ByteLevel()
+
+    trainer = trainers.BpeTrainer(
+        vocab_size=vocab_size,
+        min_frequency=min_frequency,
+        special_tokens=["<|endoftext|>", "<|pad|>"],
+    )
+    tokenizer.train_from_iterator(dataset, trainer)
+
+    # 包装为 PreTrainedTokenizerFast，这样保存后会生成：
+    #   - tokenizer.json          (核心词表/merges)
+    #   - tokenizer_config.json   (配置元信息)
+    #   - special_tokens_map.json (特殊 token 映射)
+    #   可以用 AutoTokenizer.from_pretrained() 直接加载
+    wrapped = PreTrainedTokenizerFast(
+        tokenizer_object=tokenizer,
+        bos_token=None,
+        eos_token="<|endoftext|>",
+        pad_token="<|pad|>",
+    )
+    wrapped.save_pretrained(folder_dir)
+    # 打印词表长度、训练时间、训练数据量
+    print(f"词表长度: {len(wrapped.get_vocab())}")
+    print(f"训练数据量: {len(dataset)}")
+    

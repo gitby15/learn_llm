@@ -1,8 +1,7 @@
 import os
-from datasets import load_dataset, Dataset
-from learn_llm.model.timllm.model_config import TimLLMConfig
-from learn_llm.model.tokenizer.minimind_tokenizer import MinimindTokenizer
-from learn_llm._utils_.pipeline import Pipeline, LoadNode, PipelineNode
+from datasets import Dataset
+from transformers import AutoTokenizer
+from learn_llm._utils_.pipeline import Pipeline, LoadNode, SaveNode, PipelineNode
 
 _CWD_DIR = os.getcwd()
 OUTPUT_DIR = os.path.join(_CWD_DIR, "data_outputs", "wikipedia")
@@ -14,12 +13,12 @@ class TokenizeChunkNode(PipelineNode):
 
     def __init__(
         self,
+        tokenizer,
         max_length: int,
-        tokenizer=None,
         min_chunk: int = MIN_CHUNK_LENGTH,
         batch_size: int = 1024,
     ):
-        self.tokenizer = tokenizer or MinimindTokenizer.get_tokenizer()
+        self.tokenizer = tokenizer
         self.max_length = max_length
         self.min_chunk = min_chunk
         self.batch_size = batch_size
@@ -64,8 +63,8 @@ class SortByLengthNode(PipelineNode):
 class PackDocumentsNode(PipelineNode):
     name = "pack"
 
-    def __init__(self, max_length: int, tokenizer=None):
-        self.tokenizer = tokenizer or MinimindTokenizer.get_tokenizer()
+    def __init__(self, tokenizer: AutoTokenizer, max_length: int):
+        self.tokenizer = tokenizer
         self.max_length = max_length
 
     def __call__(self, dataset: Dataset) -> Dataset:
@@ -95,49 +94,62 @@ class PackDocumentsNode(PipelineNode):
         return result
 
 
-class SaveNode(PipelineNode):
-    name = "save"
-
-    def __init__(self, output_dir: str = OUTPUT_DIR):
-        self.output_dir = output_dir
-
-    def __call__(self, dataset: Dataset) -> Dataset:
-        dataset.save_to_disk(self.output_dir)
-        return dataset
 
 
-# ---- 默认流水线 ----
 
 
-def _default_pipeline() -> Pipeline:
-    tokenizer = MinimindTokenizer.get_tokenizer()
-    model_config = TimLLMConfig(
-        vocab_size=tokenizer.vocab_size,
-    )
-    return Pipeline(
+def get_tokenizer_dataset(take_len: int = None) -> Dataset:
+    pipeline = Pipeline(
         [
-            
+            LoadNode(
+                path="wikimedia/wikipedia",
+                dataset_name="20231101.zh",
+                split="train",
+                check_dir='',
+                take_len=take_len,
+            ),
+        ]
+    )
+    return pipeline.run()
+
+
+def get_train_dataset(
+        tokenizer: AutoTokenizer,
+        context_max_len: int,
+        data_take_len: int = None,
+    ) -> Dataset:
+    if os.path.exists(OUTPUT_DIR):
+        print("预处理数据存在，直接加载...")
+        dataset = Dataset.load_from_disk(OUTPUT_DIR)
+        if data_take_len is not None:
+            dataset = dataset.take(data_take_len)
+        print(f"最终加载 {len(dataset)} 条数据")
+        return dataset
+    print("预处理数据不存在，开始数据处理流水线...")
+
+    pipeline = Pipeline(
+        [
             LoadNode(
                 path="wikimedia/wikipedia",
                 dataset_name="20231101.zh",
                 split="train",
                 check_dir=OUTPUT_DIR,
-                take_len=200000
+                take_len=data_take_len,
             ),
-            TokenizeChunkNode(max_length=model_config.max_position_embeddings, tokenizer=tokenizer),
+            TokenizeChunkNode(
+                tokenizer=tokenizer,
+                max_length=context_max_len
+            ),
             SortByLengthNode(),
-            PackDocumentsNode(max_length=model_config.max_position_embeddings, tokenizer=tokenizer),
-            SaveNode(OUTPUT_DIR),
+            PackDocumentsNode(
+                tokenizer=tokenizer,
+                max_length=context_max_len
+            ),
+            SaveNode(output_dir=OUTPUT_DIR),
         ]
     )
-
-
-def get_train_dataset() -> Dataset:
-    if os.path.exists(OUTPUT_DIR):
-        print("预处理数据存在，直接加载...")
-        return Dataset.load_from_disk(OUTPUT_DIR)
-    print("预处理数据不存在，开始数据处理流水线...")
-    _default_pipeline().run()
+    return pipeline.run()
+  
 
 
 if __name__ == "__main__":

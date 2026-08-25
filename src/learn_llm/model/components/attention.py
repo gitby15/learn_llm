@@ -14,18 +14,15 @@ class Rope(nn.Module):
         self.inv_freq: torch.Tensor  # 消除 register_buffer 产生的 Tensor | Module 类型歧义
 
     def forward(self, x):
-        return self.ropa_embedding(x)
+        return self.rope_embedding(x)
 
-    def ropa_embedding(self, x):
+    def rope_embedding(self, x):
         seq_len = x.size(-2)
         t = torch.arange(seq_len, device=x.device, dtype=x.dtype)
         freqs = torch.outer(t, self.inv_freq.to(x.device))
         emb = torch.cat((freqs, freqs), dim=-1)
-        cos = emb.cos()
-        sin = emb.sin()
-        while cos.dim() < x.dim():
-            cos = cos.unsqueeze(0)
-            sin = sin.unsqueeze(0)
+        cos = emb.cos().unsqueeze(0).unsqueeze(0)  # [1, 1, T, D]
+        sin = emb.sin().unsqueeze(0).unsqueeze(0)
         x_rotated = torch.cat((-x[..., self.dim // 2:], x[..., :self.dim // 2]), dim=-1)
         return x * cos + x_rotated * sin
 
@@ -116,6 +113,9 @@ class TransformerBlock(nn.Module):
         result = attn_out + self.dropout_ffn(ffn_out)
 
         return result
+
+
+
 
 
 class AttentionLayer(nn.Module):
