@@ -37,6 +37,7 @@ def train():
         save_total_limit=5,
         num_train_epochs=1,
         auto_find_batch_size=True,
+        train_sampling_strategy="sequential",
         learning_rate=3e-4,
         lr_scheduler_type="cosine",
         warmup_steps=500,
@@ -60,7 +61,7 @@ def train():
         trainer.train(resume_from_checkpoint=is_resume)
     except KeyboardInterrupt:
         print("\n训练被手动中断，正在保存 checkpoint...")
-        trainer._save_checkpoint(model)
+        trainer._save_checkpoint(model, trial=None)
         return
 
     trainer.save_model(ModelPath.PRETRAIN_SAVE)

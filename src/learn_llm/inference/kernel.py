@@ -6,6 +6,7 @@ class InferenceKernel:
     def __init__(self, model: AutoModelForCausalLM, tokenizer: AutoTokenizer):
         self.model = model
         self.tokenizer = tokenizer
+        self.model.eval()
         print("device", self.model.device)
 
     def generate(self, prompt: str):

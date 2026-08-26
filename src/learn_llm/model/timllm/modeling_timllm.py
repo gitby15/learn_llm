@@ -72,10 +72,15 @@ class TimLLM(PreTrainedModel, GenerationMixin):
             self.lm_head.weight = self.embedding.weight
 
     def get_size(self) -> tuple[int, dict[str, int]]:
-        total_size = 0
-        sub_module_size = {}
+        """返回 (总参数量, 各模块参数量)，自动去重 tied weights。"""
+        seen = set()
+        sub_module_size: dict[str, int] = {}
         for name, module in self.named_modules():
-            if isinstance(module, nn.Module):
-                sub_module_size[name] = sum(p.numel() for p in module.parameters(recurse=False))
-                total_size += sub_module_size[name]
-        return total_size, sub_module_size
+            count = 0
+            for p in module.parameters(recurse=False):
+                if p.data_ptr() not in seen:
+                    seen.add(p.data_ptr())
+                    count += p.numel()
+            if count > 0:
+                sub_module_size[name] = count
+        return sum(sub_module_size.values()), sub_module_size

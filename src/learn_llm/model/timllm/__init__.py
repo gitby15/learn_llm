@@ -19,9 +19,10 @@ def calculate_model_size():
     config = TimLLMConfig(vocab_size=tokenize.vocab_size)
     model = TimLLM(config)
     total_size, sub_module_size = model.get_size()
-    print(f"模型大小: {total_size / 1e6} MB")
     for name, size in sub_module_size.items():
         print(f"-{name}: {size / 1e6} MB")
+    print("===================================")
+    print(f"模型参数量: {total_size / 1e6:.2f}M")
 
 def test():
     from learn_llm.model.timllm.modeling_timllm import TimLLM

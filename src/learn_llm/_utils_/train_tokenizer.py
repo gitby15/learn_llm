@@ -26,6 +26,7 @@ def train(
         vocab_size=vocab_size,
         min_frequency=min_frequency,
         special_tokens=SPECIAL_TOKEN,
+        initial_alphabet=pre_tokenizers.ByteLevel.alphabet(),
     )
     tokenizer.train_from_iterator(dataset['text'], trainer)
 
