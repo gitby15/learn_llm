@@ -6,7 +6,7 @@ class TimLLMConfig(PreTrainedConfig):
 
     def __init__(
         self,
-        vocab_size: int = 6480,
+        vocab_size: int = 16384,
         num_hidden_layers: int = 12,
         gqa_head_dim: int = 64,
         num_attention_heads: int = 12,

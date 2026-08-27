@@ -1,3 +1,4 @@
+import argparse
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from learn_llm._utils_.model_path import ModelPath
@@ -25,13 +26,14 @@ def main():
 
 
 
-def test_online():
+def test_online(model_id:str):
 
     # model_id = "BananaMind/BananaMind-2-Mini"
     # model_id = "BananaMind/BananaMind-2.1-Unified"
     # model_id = "Qwen/Qwen3-0.6B"
-    model_id = "SupraLabs/Supra2-100M"
+    # model_id = "SupraLabs/Supra2-100M"
     # model_id = "Eclipse-Senpai/KeyLM-75M"
+    # model_id = "LiquidAI/LFM2.5-230M"
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     dtype = (
@@ -46,6 +48,7 @@ def test_online():
     ).to(device).eval()
     inference = InferenceKernel(model, tokenizer)
 
+    print("model info:", model.config)
     print("交互模式已启动，输入 'exit' 或 'quit' 退出\n")
     while True:
         try:
@@ -65,5 +68,8 @@ def test_online():
     
 
 if __name__ == "__main__":
-    test_online()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_id", type=str, required=True, help="HuggingFace model ID or local path")
+    args = parser.parse_args()
+    test_online(args.model_id)
     # main()

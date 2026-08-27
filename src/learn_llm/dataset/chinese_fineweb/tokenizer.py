@@ -13,14 +13,15 @@ class LoadNode(PipelineNode):
         dataset = load_dataset(
             path="opencsg/chinese-fineweb-edu-v2",
             split="train",
+            streaming=True,
         )
 
         if self.take_len is not None:
-            dataset = dataset.take(self.take_len)
+            dataset = dataset.shuffle(buffer_size=10000, seed=42).take(self.take_len)
         return dataset
 
 
-def get_tokenizer_dataset(take_len: int = None) -> Dataset:
+def get_tokenizer_dataset(take_len: int) -> Dataset:
     pipeline = Pipeline(
         [
             LoadNode(take_len=take_len),
@@ -30,8 +31,9 @@ def get_tokenizer_dataset(take_len: int = None) -> Dataset:
 
 
 if __name__ == "__main__":
-    dataset = get_tokenizer_dataset()
+    dataset = get_tokenizer_dataset(take_len=500)
 
     for item in dataset['text']:
         print(item)
+        print("--- item len ---", len(item))
         break

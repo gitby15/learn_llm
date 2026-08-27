@@ -5,7 +5,6 @@ from learn_llm._utils_.pipeline import Pipeline, PipelineAction, PipelineNode, P
 
 _CWD_DIR = os.getcwd()
 OUTPUT_DIR = os.path.join(_CWD_DIR, "data_outputs", "babylm_zho")
-MIN_CHUNK_LENGTH = 50
 DATASET_NAME = "BabyLM-community/babylm-zho"
 
 class CheckExistNode(PipelineNode):

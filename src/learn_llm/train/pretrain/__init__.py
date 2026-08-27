@@ -3,9 +3,11 @@ from datasets import concatenate_datasets
 from learn_llm._utils_.model_path import ModelPath
 from learn_llm.model.timllm import TimLLM
 from learn_llm.model.timllm.model_config import TimLLMConfig
-from learn_llm.tokenizer.babylm_zho import get_tokenizer
-from learn_llm.dataset.babylm.babylm_zho import get_train_dataset as get_babylm_data
-from learn_llm.dataset.wikipedia import get_train_dataset as get_wiki_data
+from learn_llm.tokenizer.chinese_fineweb.train import get_tokenizer
+from learn_llm.dataset.chinese_fineweb.pretrain import get_train_dataset
+# from learn_llm.tokenizer.babylm_zho.train import get_tokenizer
+# from learn_llm.dataset.babylm.babylm_zho import get_train_dataset as get_babylm_data
+# from learn_llm.dataset.wikipedia import get_train_dataset as get_wiki_data
 
 
 def train():
@@ -25,17 +27,15 @@ def train():
     max_len = model.config.max_position_embeddings
     tokenizer.model_max_length = max_len
 
-    # BabyLM 在前，Wikipedia 在后，一次训练自动按顺序学习
-    baby_dataset = get_babylm_data(tokenizer=tokenizer, context_max_len=max_len)
-    wiki_dataset = get_wiki_data(tokenizer=tokenizer, context_max_len=max_len)
-    train_dataset = concatenate_datasets([baby_dataset, wiki_dataset])
-
+    train_dataset = get_train_dataset(tokenizer=tokenizer, context_max_len=max_len, take_len=500000)
+    print(f"训练数据量预计：{len(train_dataset)} 条")
+    print(f"训练数据量预计：{len(train_dataset) * max_len:,} tokens ({len(train_dataset) * max_len / 1e9:.2f}B)")
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
     training_args = TrainingArguments(
         output_dir=ModelPath.PRETRAIN_CHECKPOINT,
         save_total_limit=5,
-        num_train_epochs=1,
+        num_train_epochs=2,
         auto_find_batch_size=True,
         train_sampling_strategy="sequential",
         learning_rate=3e-4,
