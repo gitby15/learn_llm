@@ -2,11 +2,8 @@ from transformers import Trainer, TrainingArguments, DataCollatorForLanguageMode
 from learn_llm._utils_.model_path import ModelPath
 from learn_llm.model.timllm import TimLLM
 from learn_llm.model.timllm.model_config import TimLLMConfig
-from learn_llm.tokenizer.chinese_fineweb.train import get_tokenizer
+from learn_llm.model.tokenizer import get_tokenizer
 from learn_llm.dataset.chinese_fineweb.pretrain import get_train_dataset
-# from learn_llm.tokenizer.babylm_zho.train import get_tokenizer
-# from learn_llm.dataset.babylm.babylm_zho import get_train_dataset as get_babylm_data
-# from learn_llm.dataset.wikipedia import get_train_dataset as get_wiki_data
 
 
 def train():

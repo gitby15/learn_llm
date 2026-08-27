@@ -13,6 +13,8 @@ class ModelPath:
     SFT_CHECKPOINT = os.path.join(BASE, "sft", "checkpoints")
     SFT_SAVE = os.path.join(BASE, "sft", "save")
 
+    TOKENIZER = os.path.join(BASE, "model", "tokenizer")
+
     @staticmethod
     def get_exist_model(model_class: type[PreTrainedModel], model_dir: str) -> PreTrainedModel | None:
         try:

@@ -1,4 +1,6 @@
 from tokenizers import Tokenizer, models, pre_tokenizers, trainers, decoders
+from learn_llm._utils_.model_path import ModelPath
+from learn_llm.dataset.chinese_fineweb.tokenizer import get_tokenizer_dataset
 from transformers import PreTrainedTokenizerFast
 from datasets import Dataset
 
@@ -60,3 +62,8 @@ def train(
     except TypeError:
         pass
     
+
+def main():
+    dataset = get_tokenizer_dataset(100000)
+    train(ModelPath.TOKENIZER, dataset, vocab_size=16384)
+        

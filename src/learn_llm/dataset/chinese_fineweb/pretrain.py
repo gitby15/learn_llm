@@ -5,7 +5,7 @@ from transformers import AutoTokenizer
 from learn_llm._utils_.pipeline import PackDocumentsNode, Pipeline, PipelineNode, SaveNode, CheckExistNode
 from datasets import Dataset, load_dataset
 _CWD_DIR = os.getcwd()
-OUTPUT_DIR = os.path.join(_CWD_DIR, "data_outputs", "babylm_zho")
+OUTPUT_DIR = os.path.join(_CWD_DIR, "data_outputs", "chinese_fineweb_edu_v2")
 DATASET_NAME = "opencsg/chinese-fineweb-edu-v2"
 
 
