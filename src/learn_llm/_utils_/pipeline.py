@@ -1,7 +1,8 @@
+import gc
 import os
 import time
 from abc import ABC, abstractmethod
-from datasets import load_dataset, Dataset
+from datasets import load_dataset, Dataset, IterableDataset
 from transformers import AutoTokenizer
 from enum import Enum
 
@@ -34,23 +35,28 @@ class PipelineNode(ABC):
 class Pipeline:
     def __init__(self, nodes: list[PipelineNode]):
         self.nodes = nodes
-    def run(self) -> Dataset: 
+    def run(self) -> Dataset:
         dataset = None
-        for node in self.nodes:
-            t0 = time.time()
-            status = node._check()
-            if status == PipelineAction.INTERRUPT:
-                print(f"流水线提前结束于[{node.name}]")
-                break
-            elif status == PipelineAction.SKIP:
-                print(f"[{node.name}] 跳过")
-                continue
-            else:
-                print(f"\n[{node.name}] 开始...")
-                dataset = node(dataset)
-            print(f"[{node.name}] 完成，耗时 {time.time() - t0:.1f}s")
-        print(f"\n流水线完成")
-        return dataset
+        try:
+            for node in self.nodes:
+                t0 = time.time()
+                status = node._check()
+                if status == PipelineAction.INTERRUPT:
+                    print(f"流水线提前结束于[{node.name}]")
+                    break
+                elif status == PipelineAction.SKIP:
+                    print(f"[{node.name}] 跳过")
+                    continue
+                else:
+                    print(f"\n[{node.name}] 开始...")
+                    dataset = node(dataset)
+                print(f"[{node.name}] 完成，耗时 {time.time() - t0:.1f}s")
+            print(f"\n流水线完成")
+            return dataset
+        finally:
+            if isinstance(dataset, IterableDataset):
+                del dataset
+                gc.collect()
 
 
 class LoadNode(PipelineNode):
@@ -107,26 +113,25 @@ class PackDocumentsNode(PipelineNode):
             _eos = self.tokenizer.eos_token_id
             max_len = self.context_max_len
             current = []
-            quota = max_len
 
             for ids in dataset['input_ids']:
-                point = 0
-                while True:
-                    if quota <= 0: # quota用完了，就 yield 当前的 current
-                        result = current
-                        current = []
-                        quota = max_len
-                        yield {"input_ids": result}
-                        break
-                    if point >= len(ids) - 1: # ids 用完了，标记结束，并break到下一个ids
-                        current.append(_eos)
-                        quota -= 1
-                        break
+                if not ids:
+                    continue
 
-                    insert_len = min(quota, len(ids) - point - 1)
-                    current.extend(ids[point:point + insert_len])
+                document = list(ids)
+                if document[-1] != _eos:
+                    document.append(_eos)
+
+                point = 0
+                while point < len(document):
+                    quota = max_len - len(current)
+                    insert_len = min(quota, len(document) - point)
+                    current.extend(document[point:point + insert_len])
                     point += insert_len
-                    quota -= insert_len
+
+                    if len(current) == max_len:
+                        yield {"input_ids": current}
+                        current = []
 
             if current:
                 yield {"input_ids": current}

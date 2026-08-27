@@ -1,3 +1,4 @@
+import argparse
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from learn_llm._utils_.model_path import ModelPath
@@ -25,14 +26,14 @@ def main():
 
 
 
-def test_online():
+def test_online(model_id:str):
 
     # model_id = "BananaMind/BananaMind-2-Mini"
     # model_id = "BananaMind/BananaMind-2.1-Unified"
-    model_id = "Qwen/Qwen3-0.6B"
-
-    tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
-    
+    # model_id = "Qwen/Qwen3-0.6B"
+    # model_id = "SupraLabs/Supra2-100M"
+    # model_id = "Eclipse-Senpai/KeyLM-75M"
+    # model_id = "LiquidAI/LFM2.5-230M"
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     dtype = (
@@ -41,32 +42,34 @@ def test_online():
         else torch.float32
     )
 
+    tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(
-        model_id,
-        trust_remote_code=True,
-        dtype=dtype,
+        model_id, trust_remote_code=True, dtype=dtype,
     ).to(device).eval()
     inference = InferenceKernel(model, tokenizer)
-    prompt = "今天的天气"
-    messages = [
-        {"role": "user", "content": prompt}
-    ]
-    text = tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
-        enable_thinking=True # Switches between thinking and non-thinking modes. Default is True.
-    )
-    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
-    print('=== Prompt: ', prompt)
-    _, ourput_str = inference.generate(prompt)
 
-    
-    print('=== Output: ', ourput_str)
+    print("model info:", model.config)
+    print("交互模式已启动，输入 'exit' 或 'quit' 退出\n")
+    while True:
+        try:
+            prompt = input(">>> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n退出")
+            break
+        if not prompt:
+            continue
+        if prompt.lower() in ("exit", "quit"):
+            break
+        _, output = inference.generate(prompt)
+        print(output[len(prompt):])  # 只打印续写部分
+        print()
 
     
     
 
 if __name__ == "__main__":
-    # test()
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_id", type=str, required=True, help="HuggingFace model ID or local path")
+    args = parser.parse_args()
+    test_online(args.model_id)
+    # main()

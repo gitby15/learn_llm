@@ -21,13 +21,24 @@ def train(
     tokenizer.pre_tokenizer = pre_tokenizers.ByteLevel()
     # ByteLevel 解码器，和 pre_tokenizer 配套使用
     tokenizer.decoder = decoders.ByteLevel()
-
+    print(f"开始训练，训练参数：vocab_size={vocab_size}, min_frequency={min_frequency}")
     trainer = trainers.BpeTrainer(
         vocab_size=vocab_size,
         min_frequency=min_frequency,
         special_tokens=SPECIAL_TOKEN,
+        initial_alphabet=pre_tokenizers.ByteLevel.alphabet(),
     )
-    tokenizer.train_from_iterator(dataset['text'], trainer)
+
+    def _iter():
+        for i, item in enumerate(dataset):
+            if i % 1000 == 0:
+                text = item['text']
+                print(len(text), "====", text[:100])
+            yield text
+
+    gen = _iter()
+    tokenizer.train_from_iterator(gen, trainer)
+    gen.close()
 
     # 包装为 PreTrainedTokenizerFast，这样保存后会生成：
     #   - tokenizer.json          (核心词表/merges)
@@ -44,5 +55,8 @@ def train(
     wrapped.save_pretrained(folder_dir)
     # 打印词表长度、训练时间、训练数据量
     print(f"词表长度: {len(wrapped.get_vocab())}")
-    print(f"训练数据量: {len(dataset)}")
+    try:
+        print(f"训练数据量: {len(dataset)}")
+    except TypeError:
+        pass
     
