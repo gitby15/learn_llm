@@ -1,4 +1,3 @@
-import argparse
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from learn_llm._utils_.model_path import ModelPath
@@ -16,12 +15,21 @@ def main():
     )
     
     inference = InferenceKernel(model, tokenizer)
-    prompt = "番茄炒蛋"
-    print('=== Prompt: ', prompt)
-    _, output_str = inference.generate(prompt)
-    
-        
-    print('=== Output: ', output_str)
+    print("model info:", model.config)
+    print("交互模式已启动，输入 'exit' 或 'quit' 退出\n")
+    while True:
+        try:
+            prompt = input(">>> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n退出")
+            break
+        if not prompt:
+            continue
+        if prompt.lower() in ("exit", "quit"):
+            break
+        _, output = inference.generate(prompt)
+        print(output)
+        print()
 
 
 
@@ -61,15 +69,15 @@ def test_online(model_id:str):
         if prompt.lower() in ("exit", "quit"):
             break
         _, output = inference.generate(prompt)
-        print(output[len(prompt):])  # 只打印续写部分
+        print(output)
         print()
 
     
     
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model_id", type=str, required=True, help="HuggingFace model ID or local path")
-    args = parser.parse_args()
-    test_online(args.model_id)
-    # main()
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--model_id", type=str, required=True, help="HuggingFace model ID or local path")
+    # args = parser.parse_args()
+    # test_online(args.model_id)
+    main()

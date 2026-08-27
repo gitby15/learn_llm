@@ -11,5 +11,5 @@ def get_tokenizer():
     return PreTrainedTokenizerFast.from_pretrained(FOLDER_DIR)
 
 if __name__ == "__main__":
-    dataset = get_tokenizer_dataset(150000)
+    dataset = get_tokenizer_dataset(100000)
     train(FOLDER_DIR, dataset, vocab_size=16384)

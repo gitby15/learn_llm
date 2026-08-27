@@ -2,7 +2,7 @@ import gc
 import os
 import time
 from abc import ABC, abstractmethod
-from datasets import load_dataset, Dataset, IterableDataset
+from datasets import Dataset, IterableDataset
 from transformers import AutoTokenizer
 from enum import Enum
 
@@ -58,36 +58,16 @@ class Pipeline:
                 del dataset
                 gc.collect()
 
-
-class LoadNode(PipelineNode):
-    name = "load"
-
-    def __init__(
-        self, path: str, dataset_name: str, split: str, check_dir: str, take_len: int = None
-    ):
-        self.path = path
-        self.dataset_name = dataset_name
-        self.split = split
-        self.check_dir = check_dir
-        self.take_len = take_len
-
-    def __call__(self, _dataset: None = None) -> Dataset:
-        dataset = load_dataset(
-            path=self.path,
-            name=self.dataset_name,
-            split=self.split,
-            streaming=False,
-        )
-        if self.take_len is not None:
-            dataset = dataset.take(self.take_len)
-        print(f"加载完成，共 {len(dataset)} 条数据")
-        return dataset
-
-    def _check(self) -> PipelineAction:
-        if os.path.exists(self.check_dir):
-            print(f"[跳过] 数据已存在: {self.check_dir}")
+class CheckExistNode(PipelineNode):
+    name = "check_exist"
+    def __init__(self, cache_dir: str):
+        self.cache_dir = cache_dir
+    def _check(self):
+        if os.path.exists(self.cache_dir):
+            print(f"缓存目录已存在: {self.cache_dir}，直接使用缓存")
             return PipelineAction.INTERRUPT
-        return PipelineAction.PASS
+        else:
+            return PipelineAction.PASS
 
 class SaveNode(PipelineNode):
     name = "save"

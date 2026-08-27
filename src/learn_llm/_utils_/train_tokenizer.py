@@ -30,15 +30,15 @@ def train(
     )
 
     def _iter():
-        for i, item in enumerate(dataset):
-            if i % 1000 == 0:
-                text = item['text']
-                print(len(text), "====", text[:100])
+        for item in dataset:
+            text = item['text']
             yield text
 
     gen = _iter()
-    tokenizer.train_from_iterator(gen, trainer)
-    gen.close()
+    try:
+        tokenizer.train_from_iterator(gen, trainer)
+    finally:
+        gen.close()
 
     # 包装为 PreTrainedTokenizerFast，这样保存后会生成：
     #   - tokenizer.json          (核心词表/merges)

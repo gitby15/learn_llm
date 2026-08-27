@@ -1,1 +1,0 @@
-用Wikipedia CN和EN的数据，训练一个BBPE tokenizer
