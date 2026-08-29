@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from transformers.cache_utils import Cache
+
 from learn_llm.model.timllm.model_config import TimLLMConfig
 
 class Rope(nn.Module):
@@ -13,12 +15,12 @@ class Rope(nn.Module):
         self.register_buffer("inv_freq", inv_freq)
         self.inv_freq: torch.Tensor  # 消除 register_buffer 产生的 Tensor | Module 类型歧义
 
-    def forward(self, x):
-        return self.rope_embedding(x)
+    def forward(self, x, start_pos: int = 0):
+        return self.rope_embedding(x, start_pos)
 
-    def rope_embedding(self, x):
+    def rope_embedding(self, x, start_pos: int = 0):
         seq_len = x.size(-2)
-        t = torch.arange(seq_len, device=x.device, dtype=x.dtype)
+        t = torch.arange(start_pos, start_pos + seq_len, device=x.device, dtype=x.dtype)
         freqs = torch.outer(t, self.inv_freq.to(x.device))
         emb = torch.cat((freqs, freqs), dim=-1)
         cos = emb.cos().unsqueeze(0).unsqueeze(0)  # [1, 1, T, D]
@@ -48,6 +50,9 @@ class GQAAttention(nn.Module):
         q: torch.Tensor,
         k: torch.Tensor,
         v: torch.Tensor,
+        start_pos: int = 0,
+        past_key_values: Cache | None = None,
+        layer_idx: int = 0,
     ) -> torch.Tensor:
         # q, k, v的形状：[B, T, C]
         b = q.size(0)
@@ -58,22 +63,24 @@ class GQAAttention(nn.Module):
         # [B, T, C] -> [B, T, H, D] -> [B, H, T, D]
         query = query.reshape(b, t_q, self.num_attention_heads, self.head_dim).transpose(1, 2)
         query = self.q_norm(query)
-        query = self.rope(query)
-        
+        query = self.rope(query, start_pos)
 
         key = self.w_k(k)
         # [B, T, C] -> [B, T, H, D] -> [B, H, T, D]
         key = key.reshape(b, t_kv, self.num_key_value_heads, self.head_dim).transpose(1, 2)
         key = self.k_norm(key)
-        key = self.rope(key)
+        key = self.rope(key, start_pos)
 
         value = self.w_v(v)
         # [B, T, C] -> [B, T, H, D] -> [B, H, T, D]
         value = value.reshape(b, t_kv, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-        
+
+        if past_key_values is not None:
+            key, value = past_key_values.update(key, value, layer_idx)
+
         attention_out = F.scaled_dot_product_attention(
             query, key, value,
-            is_causal=True,
+            is_causal=t_q > 1,
             enable_gqa=True,
         )
 
@@ -107,9 +114,22 @@ class TransformerBlock(nn.Module):
         self.ffn = SwiGLUFFN(config)
         self.dropout_ffn = nn.Dropout(config.dropout_rate)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        start_pos: int = 0,
+        past_key_values: Cache | None = None,
+        layer_idx: int = 0,
+    ) -> torch.Tensor:
         attn_in = self.layer_norm_1(x)
-        attn_out = self.attention(attn_in, attn_in, attn_in)
+        attn_out = self.attention(
+            attn_in,
+            attn_in,
+            attn_in,
+            start_pos,
+            past_key_values,
+            layer_idx,
+        )
         attn_out = x + self.dropout_attn(attn_out)
 
         ffn_in = self.layer_norm_2(attn_out)
@@ -131,12 +151,23 @@ class AttentionLayer(nn.Module):
         ])
         self.final_norm = nn.RMSNorm(config.hidden_size)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        attention_output = x
-        for block in self.blocks:
-            attention_output = block(attention_output)
+    def forward(
+        self,
+        x: torch.Tensor,
+        start_pos: int = 0,
+        past_key_values: Cache | None = None,
+    ) -> tuple[torch.Tensor, Cache | None]:
 
-        return self.final_norm(attention_output)
+        attention_output = x
+        for layer_idx, block in enumerate(self.blocks):
+            attention_output = block(
+                attention_output,
+                start_pos,
+                past_key_values,
+                layer_idx,
+            )
+
+        return self.final_norm(attention_output), past_key_values
 
 
 if __name__ == "__main__":

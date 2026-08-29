@@ -2,7 +2,7 @@ import gc
 import os
 import time
 from abc import ABC, abstractmethod
-from datasets import Dataset, IterableDataset
+from datasets import Dataset, IterableDataset, load_from_disk
 from transformers import AutoTokenizer
 from enum import Enum
 
@@ -42,10 +42,12 @@ class Pipeline:
                 t0 = time.time()
                 status = node._check()
                 if status == PipelineAction.INTERRUPT:
-                    print(f"流水线提前结束于[{node.name}]")
+                    dataset = node(dataset)
+                    print(f"[{node.name}] 完成，提前中止流水线")
                     break
                 elif status == PipelineAction.SKIP:
-                    print(f"[{node.name}] 跳过")
+                    
+                    print(f"跳过 [{node.name}] 节点")
                     continue
                 else:
                     print(f"\n[{node.name}] 开始...")
@@ -62,12 +64,14 @@ class CheckExistNode(PipelineNode):
     name = "check_exist"
     def __init__(self, cache_dir: str):
         self.cache_dir = cache_dir
+    def __call__(self, dataset=None) -> Dataset:
+        return load_from_disk(self.cache_dir)
     def _check(self):
         if os.path.exists(self.cache_dir):
             print(f"缓存目录已存在: {self.cache_dir}，直接使用缓存")
             return PipelineAction.INTERRUPT
         else:
-            return PipelineAction.PASS
+            return PipelineAction.SKIP
 
 class SaveNode(PipelineNode):
     name = "save"

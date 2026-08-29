@@ -23,7 +23,7 @@ def train():
     max_len = model.config.max_position_embeddings
     tokenizer.model_max_length = max_len
 
-    dataset = get_train_dataset(tokenizer=tokenizer, context_max_len=max_len, take_len=1500000)
+    dataset = get_train_dataset(tokenizer=tokenizer, context_max_len=max_len, take_len=150000)
     dataset_split = dataset.train_test_split(test_size=1024, seed=42)
     train_dataset = dataset_split["train"]
     eval_dataset = dataset_split["test"]
