@@ -20,8 +20,10 @@ dependencies = [
 
 [project.scripts]
 i-b = "learn_llm.inference.base:main"
+i-c = "learn_llm.inference.chat:main"
 pre-t = "learn_llm.training.pretrain.train:main"
-pre-e = "learn_llm.training.pretrain.evaluate:main"    
+pre-e = "learn_llm.training.pretrain.evaluate:main"
+sft-t = "learn_llm.training.sft:main"
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]

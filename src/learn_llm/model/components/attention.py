@@ -20,13 +20,25 @@ class Rope(nn.Module):
 
     def rope_embedding(self, x, start_pos: int = 0):
         seq_len = x.size(-2)
-        t = torch.arange(start_pos, start_pos + seq_len, device=x.device, dtype=x.dtype)
-        freqs = torch.outer(t, self.inv_freq.to(x.device))
+        t = torch.arange(
+            start_pos,
+            start_pos + seq_len,
+            device=x.device,
+            dtype=torch.float32,
+        )
+        freqs = torch.outer(
+            t,
+            self.inv_freq.to(device=x.device, dtype=torch.float32),
+        )
         emb = torch.cat((freqs, freqs), dim=-1)
         cos = emb.cos().unsqueeze(0).unsqueeze(0)  # [1, 1, T, D]
         sin = emb.sin().unsqueeze(0).unsqueeze(0)
-        x_rotated = torch.cat((-x[..., self.dim // 2:], x[..., :self.dim // 2]), dim=-1)
-        return x * cos + x_rotated * sin
+        x_float = x.float()
+        x_rotated = torch.cat(
+            (-x_float[..., self.dim // 2:], x_float[..., :self.dim // 2]),
+            dim=-1,
+        )
+        return (x_float * cos + x_rotated * sin).to(dtype=x.dtype)
 
 
 class GQAAttention(nn.Module):

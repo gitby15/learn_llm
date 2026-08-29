@@ -46,7 +46,6 @@ class Pipeline:
                     print(f"[{node.name}] 完成，提前中止流水线")
                     break
                 elif status == PipelineAction.SKIP:
-                    
                     print(f"跳过 [{node.name}] 节点")
                     continue
                 else:
