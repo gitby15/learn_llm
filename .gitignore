@@ -10,11 +10,7 @@ wheels/
 .venv
 
 # model weights
-checkpoints/
-trained_model/
-trained_model_old/
-sft_model/
-sft_checkpoints/
 model_outputs/
+model_outputs_backup/
 data_outputs/
 logs/

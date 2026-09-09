@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers import GenerationMixin, PreTrainedModel
+from transformers.cache_utils import Cache, DynamicCache
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from learn_llm.model.components.attention import AttentionLayer
@@ -28,14 +29,22 @@ class TimLLM(PreTrainedModel, GenerationMixin):
         self,
         input_ids: torch.LongTensor,
         labels: torch.LongTensor | None = None,
-        **kwargs,  # Todo: 研究一下transformer框架都会传什么东西进来
+        past_key_values: Cache | None = None,
+        use_cache: bool | None = None,
+        **kwargs,
     ) -> CausalLMOutputWithPast:
+        if use_cache and past_key_values is None:
+            past_key_values = DynamicCache(config=self.config)
+        start_pos = past_key_values.get_seq_length() if past_key_values is not None else 0
+
         # 1. Embedding: [B, T] -> [B, T, C]
         hidden_states = self.embedding(input_ids)
         hidden_states = self.dropout_embed(hidden_states)
 
         # 2. Transformer layers
-        hidden_states = self.attention_layer(hidden_states)
+        hidden_states, new_past_key_values = self.attention_layer(
+            hidden_states, start_pos, past_key_values,
+        )
 
         # 3. LM Head -> logits: [B, T, V]
         logits = self.lm_head(hidden_states)
@@ -55,6 +64,7 @@ class TimLLM(PreTrainedModel, GenerationMixin):
         return CausalLMOutputWithPast(
             loss=loss,
             logits=logits,
+            past_key_values=new_past_key_values,
         )
 
     def get_input_embeddings(self):

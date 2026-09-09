@@ -19,12 +19,11 @@ dependencies = [
 ]
 
 [project.scripts]
-i-cli = "learn_llm.inference.cli:main"
-i-b = "learn_llm.inference.base:test_online"
-i-web = "learn_llm.inference.web_server.inference_kernel:main"
-pre-t = "learn_llm.train.pretrain:main"
-pre-e = "learn_llm.train.pretrain.evaluate:main"
-sft-t = "learn_llm.train.sft:main"
+i-b = "learn_llm.inference.base:main"
+i-c = "learn_llm.inference.chat:main"
+pre-t = "learn_llm.training.pretrain.train:main"
+pre-e = "learn_llm.training.pretrain.evaluate:main"
+sft-t = "learn_llm.training.sft:main"
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]

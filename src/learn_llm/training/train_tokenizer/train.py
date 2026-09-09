@@ -1,4 +1,6 @@
 from tokenizers import Tokenizer, models, pre_tokenizers, trainers, decoders
+from learn_llm._utils_.model_path import ModelPath
+from learn_llm.dataset.chinese_fineweb.tokenizer import get_tokenizer_dataset
 from transformers import PreTrainedTokenizerFast
 from datasets import Dataset
 
@@ -30,15 +32,15 @@ def train(
     )
 
     def _iter():
-        for i, item in enumerate(dataset):
-            if i % 1000 == 0:
-                text = item['text']
-                print(len(text), "====", text[:100])
+        for item in dataset:
+            text = item['text']
             yield text
 
     gen = _iter()
-    tokenizer.train_from_iterator(gen, trainer)
-    gen.close()
+    try:
+        tokenizer.train_from_iterator(gen, trainer)
+    finally:
+        gen.close()
 
     # 包装为 PreTrainedTokenizerFast，这样保存后会生成：
     #   - tokenizer.json          (核心词表/merges)
@@ -60,3 +62,8 @@ def train(
     except TypeError:
         pass
     
+
+def main():
+    dataset = get_tokenizer_dataset(100000)
+    train(ModelPath.TOKENIZER, dataset, vocab_size=16384)
+        
