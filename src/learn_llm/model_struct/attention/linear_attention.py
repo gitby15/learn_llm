@@ -1,9 +1,14 @@
+# 线性注意力的核心是 S = S(t-1) + Kt*Vt
+# 相关变种：
+# RetNet： S = γ*S(t-1) + Kt*Vt, 0<γ<1
+# Gate Linear Attention: S = Gate*S(t-1) + Kt*Vt
+# RWKV、SSM、Mamba 等结构后面再继续学习
+
 import torch
 import torch.nn.functional as F
 from torch import nn
 
 EPS = 1e-6  # 用于防止0除
-
 
 class LinearAttention(nn.Module):
     def __init__(self, hidden_size: int, head_dim: int):
@@ -26,24 +31,36 @@ class LinearAttention(nn.Module):
         q: torch.Tensor,
         k: torch.Tensor,
         v: torch.Tensor,
-        past_key_value: torch.Tensor | None = None,
+        attention_mask: torch.Tensor | None = None,
+        past_key_value: tuple[torch.Tensor, torch.Tensor] | None = None,
     ):
         B, T, D = q.shape
         q = self.feature_map(q)
         k = self.feature_map(k)
 
-        # 中间产物
-        S = torch.zeros(B, D, D, device=q.device, dtype=q.dtype)
+        if past_key_value is not None:
+            S, Z = past_key_value
+        else:
+            # 中间产物
+            S = torch.zeros(B, D, D, device=q.device, dtype=q.dtype)
+            # 用于归一化的分母
+            Z = torch.zeros(B, D, device=q.device, dtype=q.dtype)
 
-        # 用于归一化的分母
-        Z = torch.zeros(B, D, device=q.device, dtype=q.dtype)
-
-        output = torch.zeros(B, T, D)
+        output = torch.zeros(B, T, D, device=q.device, dtype=q.dtype)
         for t in range(T):
             # 形状是(B, D)
             q_t = q[:, t, :]
             k_t = k[:, t, :]
             v_t = v[:, t, :]
+
+            if attention_mask is not None:
+                # 线性注意力的mask核心是不要污染S和Z，所以可以盯着S和Z来实现
+                mask = attention_mask[:, t].unsqueeze(-1)
+                # Q也可以不乘以mask，因为计算出来的output，在后面的流程中不会被用到，要么是decode出来的值被抛弃，要么是训练时计算loss的时候被抛弃
+                q_t = q_t * mask
+                k_t = k_t * mask
+                # 实际上v可以不乘mask，因为在计算kv_t的时候，相同位置会跟k的0相乘，结果还是0
+                v_t = v_t * mask
 
             # [B, D, 1] * [B, 1, D] = [B, D, D]
             kv_t = k_t.unsqueeze(-1) @ v_t.unsqueeze(-2)
@@ -52,11 +69,12 @@ class LinearAttention(nn.Module):
 
             # [B , 1, D] @ [B, D, D] = [B, 1, D]
             numerator = q_t.unsqueeze(-2) @ S
-            # 
-            denominator = (q_t * Z).sum(dim=-1, keepdim=True)
-            output[:, t, :] = numerator / (denominator.clamp_min(EPS))
-        if past_key_value is not None:
-            output = output + past_key_value
+            # [B, D] * [B, D] sum -> [B, 1] -> [B, 1, 1]
+            denominator = (q_t * Z).sum(dim=-1, keepdim=True).unsqueeze(-1)
+            # [B, 1, D] / [B, 1, 1] -> [B, 1, D]
+            attention = numerator / (denominator.clamp_min(EPS))
+            output[:, t, :] = attention.squeeze(-2)
+
         return output, (S, Z)
 
     def forward(
@@ -64,23 +82,27 @@ class LinearAttention(nn.Module):
         q: torch.Tensor,
         k: torch.Tensor,
         v: torch.Tensor,
+        # 形状是[B, T]
+        attention_mask: torch.Tensor | None = None,
         past_key_value: tuple[torch.Tensor, torch.Tensor] | None = None,
-    ) :
+    ):
         query = self.w_q(q)
         key = self.w_k(k)
         value = self.w_v(v)
 
-        attention, kv_cache = self._attention(query, key, value, past_key_value)
+        attention, kv_cache = self._attention(
+            query, key, value, attention_mask, past_key_value
+        )
 
         return self.w_o(attention), kv_cache
 
 
 if __name__ == "__main__":
-    B, H, N, D = (2, 3, 4, 5)
-    Q = torch.ones(B, H, N, D)
-    S = torch.zeros(B, H, D, D)
-    for t in range(N):
-        q = Q[:, :, t]
-        S = S + q.unsqueeze(-1) @ q.unsqueeze(-2)
+    B, D, C = (2, 3, 4)
+    q = torch.ones(B, D, C)
+    z = torch.ones(B, D, 1)
 
-    print(S)
+    result = q / z
+
+    print(result.shape)
+    print(result)
