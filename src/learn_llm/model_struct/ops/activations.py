@@ -15,12 +15,11 @@ def silu(x: torch.Tensor) -> torch.Tensor:
 
 @torch.compile()
 class SwiGluFFn(nn.Module):
-    def __init__(self, hidden_size: int):
+    def __init__(self, hidden_size: int, up_size: int):
         super().__init__()
-        intermediate_size = hidden_size * 4
-        self.gate_proj = nn.Linear(hidden_size, intermediate_size, bias=False)
-        self.up_proj = nn.Linear(hidden_size, intermediate_size, bias=False)
-        self.down_proj = nn.Linear(intermediate_size, hidden_size, bias=False)
+        self.gate_proj = nn.Linear(hidden_size, up_size, bias=False)
+        self.up_proj = nn.Linear(hidden_size, up_size, bias=False)
+        self.down_proj = nn.Linear(up_size, hidden_size, bias=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         gate = self.gate_proj(x)
